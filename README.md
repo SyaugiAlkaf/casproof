@@ -54,9 +54,10 @@ Verification can be sold per-read. The `/verify` endpoint is paywalled with [x40
 ### Contract
 ```bash
 cd contract
-cargo odra test          # OdraVM unit tests
-cargo odra build         # produces wasm/AttestationRegistry.wasm
+make test                # OdraVM unit tests  (= cargo odra test)
+make build               # build + wasm-opt -Oz → wasm/AttestationRegistry.wasm (~192 KB)
 ```
+`make build` runs `cargo odra build` then shrinks the wasm with `wasm-opt -Oz` to lower install gas; plain `cargo odra build` works too.
 
 ### Agents
 ```bash

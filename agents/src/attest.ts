@@ -1,4 +1,6 @@
-import { blake2bHex } from "blakejs";
+import blakejs from "blakejs";
+
+const { blake2bHex } = blakejs;
 
 export interface AgentOutput {
   modelId: string;

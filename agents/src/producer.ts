@@ -30,8 +30,9 @@ async function main() {
 
   const key = loadKey(process.env.PRODUCER_KEY_PATH ?? "./keys/producer_secret_key.pem");
   console.log("attesting on-chain ...");
-  const txHash = await attest(key, oh, output.modelId, ph);
-  console.log("attested. tx:", txHash);
+  const r = await attest(key, oh, output.modelId, ph);
+  console.log("attested. tx:", r.txHash);
+  console.log("explorer  :", r.explorer);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

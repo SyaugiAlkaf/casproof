@@ -1,7 +1,9 @@
 import "dotenv/config";
 import { readFileSync } from "node:fs";
-import { Args, CLValue, SessionBuilder } from "casper-js-sdk";
+import sdk from "casper-js-sdk";
 import { rpc, loadKey, network } from "./casper.js";
+
+const { Args, CLValue, SessionBuilder } = sdk;
 
 const WASM_PATH = process.env.WASM_PATH ?? "../contract/wasm/AttestationRegistry.wasm";
 const INSTALL_PAYMENT = Number(process.env.INSTALL_PAYMENT_MOTES ?? 400_000_000_000);

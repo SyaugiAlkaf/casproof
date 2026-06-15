@@ -4,9 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "deploy": "tsx src/deploy.ts",
+    "resolve": "tsx src/resolve.ts",
     "producer": "tsx src/producer.ts",
     "consumer": "tsx src/consumer.ts",
-    "demo": "tsx src/demo.ts"
+    "demo": "tsx src/demo.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test src/agents.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",

@@ -1,6 +1,7 @@
 import "dotenv/config";
 import Anthropic from "@anthropic-ai/sdk";
 import { AgentOutput, outputHash, promptHash } from "./attest.js";
+import { attest, loadKey } from "./casper.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
 
@@ -26,8 +27,11 @@ async function main() {
   const ph = promptHash(output.prompt);
   console.log("feed payload:", JSON.stringify(output.payload));
   console.log("output hash :", oh);
-  console.log("prompt hash :", ph);
-  console.log("\nNext: attest on-chain with this hash via casper.attest()");
+
+  const key = loadKey(process.env.PRODUCER_KEY_PATH ?? "./keys/producer_secret_key.pem");
+  console.log("attesting on-chain ...");
+  const txHash = await attest(key, oh, output.modelId, ph);
+  console.log("attested. tx:", txHash);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

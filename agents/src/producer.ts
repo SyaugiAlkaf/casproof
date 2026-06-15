@@ -17,7 +17,10 @@ export async function produceFeed(): Promise<AgentOutput> {
     messages: [{ role: "user", content: RWA_PROMPT }],
   });
   const text = res.content.find((b) => b.type === "text");
-  const json = JSON.parse((text as { text: string }).text);
+  const raw = (text as { text: string } | undefined)?.text ?? "";
+  const match = raw.match(/\{[\s\S]*\}/);
+  if (!match) throw new Error(`model did not return JSON: ${raw.slice(0, 120)}`);
+  const json = JSON.parse(match[0]);
   return { modelId: "claude-opus-4-8", prompt: RWA_PROMPT, payload: json };
 }
 

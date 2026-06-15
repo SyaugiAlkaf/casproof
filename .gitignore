@@ -33,6 +33,8 @@ service-account*.json
 # --- rust / odra ---
 /contract/target
 /contract/wasm
+/contract/.backend*
+/contract/.builder*
 **/*.rs.bk
 Cargo.lock
 

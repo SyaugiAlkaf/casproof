@@ -1,4 +1,6 @@
 #![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
+extern crate alloc;
 
 use odra::prelude::*;
 
@@ -85,7 +87,7 @@ impl AttestationRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use odra::host::{Deployer, HostRef};
+    use odra::host::{Deployer, NoArgs};
 
     #[test]
     fn attest_and_verify() {

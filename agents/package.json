@@ -9,6 +9,8 @@
     "producer": "tsx src/producer.ts",
     "consumer": "tsx src/consumer.ts",
     "demo": "tsx src/demo.ts",
+    "x402:server": "tsx src/server.ts",
+    "x402:verify": "tsx src/payVerify.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/agents.test.ts"
   },
@@ -19,8 +21,8 @@
     "dotenv": "^16.4.5"
   },
   "devDependencies": {
+    "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
-    "typescript": "^5.6.0",
-    "@types/node": "^22.0.0"
+    "typescript": "^5.6.0"
   }
 }

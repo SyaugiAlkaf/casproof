@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { AddressInfo } from "node:net";
 import { canonical, outputHash, promptHash, AgentOutput } from "./attest.js";
 import { stateItemKey, isTrusted, findAttestation, explorerTxUrl } from "./casper.js";
+import { challenge, encodePayment, decodePayment, paymentRequirements, X402_VERSION } from "./x402.js";
 
 test("canonical is independent of key order", () => {
   assert.equal(canonical({ a: 1, b: 2 }), canonical({ b: 2, a: 1 }));
@@ -37,6 +39,40 @@ test("isTrusted trusts any signer when no allow-list is set", () => {
 
 test("explorerTxUrl builds a testnet deploy link", () => {
   assert.match(explorerTxUrl("abc"), /cspr\.live\/deploy\/abc$/);
+});
+
+test("x402 challenge offers a casper exact payment requirement", () => {
+  const c = challenge("http://x/verify?hash=ab");
+  assert.equal(c.x402Version, X402_VERSION);
+  assert.equal(c.accepts[0].scheme, "exact");
+  assert.match(c.accepts[0].network, /^casper:/);
+  assert.equal(c.accepts[0].resource, "http://x/verify?hash=ab");
+});
+
+test("x402 payment payload round-trips through the X-PAYMENT header", () => {
+  const reqs = paymentRequirements("http://x/verify?hash=ab");
+  const payload = { x402Version: X402_VERSION, scheme: reqs.scheme, network: reqs.network, payload: { nonce: "42" } };
+  assert.deepEqual(decodePayment(encodePayment(payload)), payload);
+});
+
+test("x402 server returns 402 unpaid, opens the gate once paid (sim mode)", async () => {
+  process.env.X402_MODE = "sim";
+  const { server } = await import("./server.js");
+  await new Promise<void>((r) => server.listen(0, r));
+  const port = (server.address() as AddressInfo).port;
+  const url = `http://localhost:${port}/verify?hash=${"a".repeat(64)}`;
+  try {
+    const unpaid = await fetch(url);
+    assert.equal(unpaid.status, 402);
+    const offer = (await unpaid.json()) as { accepts: Array<{ scheme: string }> };
+    assert.equal(offer.accepts[0].scheme, "exact");
+
+    const payment = { x402Version: X402_VERSION, scheme: "exact", network: "casper:casper-test", payload: { nonce: "1" } };
+    const paid = await fetch(url, { headers: { "x-payment": encodePayment(payment) } });
+    assert.notEqual(paid.status, 402); // payment accepted; past the paywall (chain read may 500 without a deployed contract)
+  } finally {
+    await new Promise<void>((r) => server.close(() => r()));
+  }
 });
 
 test(

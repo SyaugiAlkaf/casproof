@@ -67,6 +67,9 @@ cd agents
 npm install
 cp ../.env.example ../.env       # fill in keys + RPC + (after deploy) the contract hash
 
+npm run keygen                   # generate a fresh ed25519 key → keys/producer_secret_key.pem
+#   → fund the printed public key once at https://testnet.cspr.live/tools/faucet
+
 npm run deploy                   # install the registry on testnet (uses PRODUCER_KEY_PATH)
 npm run resolve                  # print REGISTRY_CONTRACT_HASH from your account's named keys
 #   → paste it into .env

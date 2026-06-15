@@ -9,7 +9,7 @@ function firstMatch(value: unknown, re: RegExp): string {
 
 async function main() {
   const key = loadKey(process.env.PRODUCER_KEY_PATH ?? "./keys/producer_secret_key.pem");
-  const account = key.publicKey.accountHash().toString();
+  const account = key.publicKey.accountHash().toPrefixedString();
   console.log("producer account:", account);
 
   let pkg = "";

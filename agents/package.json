@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "keygen": "tsx src/keygen.ts",
     "deploy": "tsx src/deploy.ts",
     "resolve": "tsx src/resolve.ts",
     "producer": "tsx src/producer.ts",

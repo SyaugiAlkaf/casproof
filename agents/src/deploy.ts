@@ -35,10 +35,10 @@ async function main() {
   console.log("submitted:", JSON.stringify((res as { transactionHash?: unknown }).transactionHash));
   await rpc.waitForTransaction(tx, 300_000);
 
-  console.log("\ninstalled. find the contract hash under your account's named keys:");
-  console.log(`  named key: ${PACKAGE_KEY}  ->  resolve its latest contract version`);
-  console.log(`  account  : ${key.publicKey.accountHash().toString()}`);
-  console.log("on cspr.live (testnet): open your account → Named Keys → copy the contract hash");
+  console.log("\ninstalled. resolve the contract hash with `npm run resolve`, or on cspr.live:");
+  console.log(`  account  : ${key.publicKey.accountHash().toPrefixedString()}`);
+  console.log(`  named key: ${PACKAGE_KEY}  ->  open the package → copy the contract hash`);
+  console.log("then set REGISTRY_CONTRACT_HASH in .env");
   console.log("then set REGISTRY_CONTRACT_HASH in .env");
 }
 

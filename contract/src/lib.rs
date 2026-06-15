@@ -107,4 +107,38 @@ mod tests {
         let res = registry.try_attest("dup".into(), "m".into(), "p".into());
         assert_eq!(res, Err(Error::AlreadyAttested.into()));
     }
+
+    #[test]
+    fn verify_unknown_returns_none() {
+        let env = odra_test::env();
+        let registry = AttestationRegistry::deploy(&env, NoArgs);
+        assert!(registry.verify("never-attested".into()).is_none());
+    }
+
+    #[test]
+    fn owner_is_trusted_by_default() {
+        let env = odra_test::env();
+        let registry = AttestationRegistry::deploy(&env, NoArgs);
+        assert!(registry.is_trusted(env.get_account(0)));
+        assert!(!registry.is_trusted(env.get_account(1)));
+    }
+
+    #[test]
+    fn owner_can_add_a_trusted_signer() {
+        let env = odra_test::env();
+        let mut registry = AttestationRegistry::deploy(&env, NoArgs);
+        let other = env.get_account(1);
+        registry.set_trusted(other, true);
+        assert!(registry.is_trusted(other));
+    }
+
+    #[test]
+    fn non_owner_cannot_set_trusted() {
+        let env = odra_test::env();
+        let mut registry = AttestationRegistry::deploy(&env, NoArgs);
+        let attacker = env.get_account(1);
+        env.set_caller(attacker);
+        let res = registry.try_set_trusted(attacker, true);
+        assert_eq!(res, Err(Error::NotOwner.into()));
+    }
 }

@@ -1,0 +1,18 @@
+[package]
+name = "casproof-contract"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+odra = { version = "2.1.0", default-features = false }
+
+[dev-dependencies]
+odra-test = "2.1.0"
+
+[lib]
+crate-type = ["rlib"]
+doctest = false
+
+[profile.release]
+codegen-units = 1
+lto = true

@@ -1,0 +1,47 @@
+# --- Claude planning artifacts (NEVER commit) ---
+CLAUDE.md
+HANDOFF.md
+PLAN.md
+IDEAS.md
+GOALS.md
+MVP_SCOPE.md
+ROADMAP.md
+auto_handoff_latest.md
+.claude/
+docs/research_dossier.md
+docs/compliance_plan.md
+docs/social_plan.md
+docs/idea_lock.md
+docs/ops/
+docs/weekly_intel/
+docs/weekly_kpi/
+docs/daily/
+customers/
+
+# --- secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+service-account*.json
+*credentials*.json
+.vault-token
+
+# --- rust / odra ---
+/contract/target
+/contract/wasm
+**/*.rs.bk
+Cargo.lock
+
+# --- node ---
+node_modules/
+dist/
+.next/
+*.tsbuildinfo
+npm-debug.log*
+
+# --- os ---
+.DS_Store

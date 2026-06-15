@@ -1,0 +1,38 @@
+import "dotenv/config";
+import Anthropic from "@anthropic-ai/sdk";
+import { AgentOutput, outputHash, promptHash } from "./attest.js";
+
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY! });
+
+const RWA_PROMPT =
+  "You price a tokenized parking-garage revenue note. Given occupancy 78%, " +
+  "daily gross $14,200, 30-day trailing. Return strict JSON only: " +
+  '{"asset":"PARK-NOTE-001","fairValueUsd":<number>,"confidence":<0..1>}';
+
+export async function produceFeed(): Promise<AgentOutput> {
+  const res = await anthropic.messages.create({
+    model: "claude-opus-4-8",
+    max_tokens: 256,
+    messages: [{ role: "user", content: RWA_PROMPT }],
+  });
+  const text = res.content.find((b) => b.type === "text");
+  const json = JSON.parse((text as { text: string }).text);
+  return { modelId: "claude-opus-4-8", prompt: RWA_PROMPT, payload: json };
+}
+
+async function main() {
+  const output = await produceFeed();
+  const oh = outputHash(output);
+  const ph = promptHash(output.prompt);
+  console.log("feed payload:", JSON.stringify(output.payload));
+  console.log("output hash :", oh);
+  console.log("prompt hash :", ph);
+  console.log("\nNext: attest on-chain with this hash via casper.attest()");
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

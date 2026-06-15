@@ -6,6 +6,8 @@ An autonomous agent that produces a result — a price feed, a risk score, an RW
 
 Casproof is the open, agent-economy version of [Prove AI](https://prove.ai) — Casper Labs' own commercial verifiable-AI product — built natively for autonomous agents that pay, attest, and verify on-chain.
 
+![Casproof dashboard — verify an AI agent output on-chain, and watch a poisoned feed get blocked](docs/dashboard.png)
+
 ## The problem
 
 Casper's thesis is to be the trust layer for the agent economy. But on a chain that sells *verifiable AI*, there is currently no open, on-chain way to verify what an AI agent actually produced. Agents consume each other's outputs — feeds, scores, signals — with no way to know whether an output is the genuine model result or has been swapped, replayed, or tampered with. The first agent that acts on a poisoned feed loses real money.

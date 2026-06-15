@@ -125,6 +125,7 @@ async function readAttestationOnChain(outputHash: string): Promise<AttestationRe
 let cachedUref: string | undefined;
 async function resolveStateUref(): Promise<string> {
   if (cachedUref) return cachedUref;
+  let lastErr: unknown;
   for (const key of contractKeyFormats(CONTRACT_HASH)) {
     try {
       const res = await rpc.queryLatestGlobalState(key, [STATE_DICTIONARY]);
@@ -134,11 +135,12 @@ async function resolveStateUref(): Promise<string> {
         return uref;
       }
     } catch (e) {
-      if (!isNotFound(e)) throw e;
+      lastErr = e;
     }
   }
   throw new Error(
-    `could not resolve the '${STATE_DICTIONARY}' dictionary uref for contract ${CONTRACT_HASH} — check REGISTRY_CONTRACT_HASH`
+    `could not resolve the '${STATE_DICTIONARY}' dictionary uref for contract ${CONTRACT_HASH} — check REGISTRY_CONTRACT_HASH` +
+      (lastErr ? ` (last error: ${(lastErr as Error).message})` : "")
   );
 }
 

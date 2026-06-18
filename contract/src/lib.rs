@@ -24,6 +24,7 @@ pub struct OutputAttested {
 pub enum Error {
     NotOwner = 1,
     AlreadyAttested = 2,
+    NotTrusted = 3,
 }
 
 #[odra::module(events = [OutputAttested])]
@@ -42,10 +43,13 @@ impl AttestationRegistry {
     }
 
     pub fn attest(&mut self, output_hash: String, model_id: String, prompt_hash: String) {
+        let signer = self.env().caller();
+        if !self.trusted.get(&signer).unwrap_or(false) {
+            self.env().revert(Error::NotTrusted);
+        }
         if self.attestations.get(&output_hash).is_some() {
             self.env().revert(Error::AlreadyAttested);
         }
-        let signer = self.env().caller();
         let timestamp = self.env().get_block_time();
         self.attestations.set(
             &output_hash,
@@ -140,5 +144,25 @@ mod tests {
         env.set_caller(attacker);
         let res = registry.try_set_trusted(attacker, true);
         assert_eq!(res, Err(Error::NotOwner.into()));
+    }
+
+    #[test]
+    fn untrusted_signer_cannot_attest() {
+        let env = odra_test::env();
+        let mut registry = AttestationRegistry::deploy(&env, NoArgs);
+        env.set_caller(env.get_account(1));
+        let res = registry.try_attest("h".into(), "m".into(), "p".into());
+        assert_eq!(res, Err(Error::NotTrusted.into()));
+    }
+
+    #[test]
+    fn owner_can_onboard_a_signer_who_then_attests() {
+        let env = odra_test::env();
+        let mut registry = AttestationRegistry::deploy(&env, NoArgs);
+        let oracle = env.get_account(1);
+        registry.set_trusted(oracle, true);
+        env.set_caller(oracle);
+        registry.attest("h".into(), "m".into(), "p".into());
+        assert_eq!(registry.verify("h".into()).unwrap().signer, oracle);
     }
 }

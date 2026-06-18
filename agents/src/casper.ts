@@ -156,6 +156,9 @@ export function stateItemKey(fieldIndex: number, key: string): string {
   return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
 }
 
+// On-chain trust is enforced by the registry: attest() reverts for non-trusted callers,
+// so any attestation that exists was written by a registry-trusted signer. This optional
+// allow-list lets a consumer narrow trust further; empty = accept any on-chain attestation.
 export function isTrusted(signer: string): boolean {
   if (TRUSTED.length === 0) return true;
   return TRUSTED.includes(signer.toLowerCase());

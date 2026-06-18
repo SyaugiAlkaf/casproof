@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "casproof": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp.ts"],
+      "cwd": "/absolute/path/to/casproof/agents",
+      "env": {
+        "CASPER_CHAIN_RPC": "https://node.testnet.casper.network/rpc",
+        "REGISTRY_CONTRACT_HASH": "<your deployed contract hash>",
+        "PRODUCER_KEY_PATH": "./keys/producer_secret_key.pem"
+      }
+    }
+  }
+}

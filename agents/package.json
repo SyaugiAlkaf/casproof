@@ -12,14 +12,17 @@
     "demo": "tsx src/demo.ts",
     "x402:server": "tsx src/server.ts",
     "x402:verify": "tsx src/payVerify.ts",
+    "mcp": "tsx src/mcp.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/agents.test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.40.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "blakejs": "^1.2.1",
     "casper-js-sdk": "^5.0.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

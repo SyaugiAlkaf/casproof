@@ -75,6 +75,26 @@ test("x402 server returns 402 unpaid, opens the gate once paid (sim mode)", asyn
   }
 });
 
+test("mcp server exposes the casproof tools and computes a correct hash", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+  const transport = new StdioClientTransport({ command: "npx", args: ["tsx", "src/mcp.ts"] });
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(transport);
+  try {
+    const tools = (await client.listTools()).tools.map((t) => t.name);
+    assert.deepEqual(tools.sort(), ["casproof_attest", "casproof_compute_hash", "casproof_verify"]);
+    const res = await client.callTool({
+      name: "casproof_compute_hash",
+      arguments: { modelId: "claude-opus-4-8", prompt: "p", payload: { asset: "PARK-NOTE-001", fairValueUsd: 1234567, confidence: 0.82 } },
+    });
+    const out = JSON.parse((res.content as Array<{ text: string }>)[0].text);
+    assert.equal(out.outputHash, "83784d8eadfb07e174eab9591ca4d4cd8a059053a5b564a196b3b2eae6003a08");
+  } finally {
+    await client.close();
+  }
+});
+
 test(
   "findAttestation reads the live registry and reports an unknown hash as unattested",
   { skip: !process.env.REGISTRY_CONTRACT_HASH ? "REGISTRY_CONTRACT_HASH not set (contract not deployed)" : false },

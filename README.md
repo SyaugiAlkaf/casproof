@@ -1,5 +1,7 @@
 # Casproof
 
+[![ci](https://github.com/SyaugiAlkaf/casproof/actions/workflows/ci.yml/badge.svg)](https://github.com/SyaugiAlkaf/casproof/actions/workflows/ci.yml)
+
 **Verifiable proof of AI agent outputs on the Casper Network.**
 
 An autonomous agent that produces a result — a price feed, a risk score, an RWA valuation — can publish a cryptographic attestation of that result on-chain: which model produced it, under which prompt, signed by which agent, at which block time. Any other agent can check that attestation before trusting the output and acting on it.

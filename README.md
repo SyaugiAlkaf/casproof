@@ -16,18 +16,7 @@ Casproof closes that gap with a registry contract, two reference agents, an x402
 
 ## How it works
 
-```
-  ┌──────────────────┐        attest(output_hash,           ┌────────────────────────┐
-  │  Producer agent  │        model_id, prompt_hash)        │  AttestationRegistry   │
-  │  (Anthropic LLM) │ ───────────────────────────────────▶ │  (Odra → WASM, testnet)│
-  │  prices an RWA   │        real testnet transaction      │  output_hash → record  │
-  └──────────────────┘                                      └───────────┬────────────┘
-                                                                        │ state read (RPC)
-  ┌──────────────────┐        verify(output_hash)                       │ or x402-metered
-  │  Consumer agent  │ ◀────────────────────────────────────────────────┘
-  │  (DeFi payout)   │   attested by a trusted signer? ── yes ─▶ release payout
-  └──────────────────┘                              └──────── no ──▶ BLOCK, log refusal
-```
+![Casproof architecture — producer agent attests on-chain, consumer agent verifies before paying, exposed over MCP and metered with x402](docs/architecture.png)
 
 1. **Producer agent** generates an output (here: an RWA valuation for a tokenized parking-revenue note), hashes the payload deterministically (BLAKE2b-256 over a canonical JSON encoding), and calls `attest(output_hash, model_id, prompt_hash)` on the registry. The attestation is a real on-chain transaction that emits an `OutputAttested` event.
 2. **Consumer agent** — a DeFi agent about to release a payout against that feed — recomputes the hash and looks it up in the registry. It releases funds only if the output is attested. A tampered or unattested feed produces a different hash, finds no attestation, and is refused.

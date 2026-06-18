@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      :root {
+        --ink: #05060a; --ink2: #0b0e18; --card: #0e111c; --line: rgba(148,163,184,0.14);
+        --mint: #34d399; --mint-soft: #5eead4; --red: #f87171; --slate: #94a3b8; --slate2: #cbd5e1; --white: #e6edf6;
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Inter, sans-serif; }
+      body { width: 1280px; background: radial-gradient(120% 90% at 50% -10%, rgba(45,212,191,0.10), var(--ink) 55%); color: var(--white); padding: 56px 64px; }
+      .head { margin-bottom: 36px; }
+      .kicker { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; }
+      h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; }
+      h1 .grad { background: linear-gradient(90deg, var(--mint-soft), var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .sub { color: var(--slate); font-size: 15px; margin-top: 8px; }
+      .row { display: flex; align-items: stretch; gap: 18px; margin-top: 14px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; flex: 1; box-shadow: 0 24px 60px -36px rgba(0,0,0,.9); }
+      .card.mint { border-color: rgba(52,211,153,.35); box-shadow: 0 0 0 1px rgba(94,234,212,.12), 0 24px 80px -32px rgba(45,212,191,.30); }
+      .card.red { border-color: rgba(248,113,113,.35); }
+      .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
+      .title { font-size: 18px; font-weight: 600; margin: 6px 0 4px; }
+      .desc { font-size: 13px; color: var(--slate); line-height: 1.5; }
+      .pill { display: inline-block; font-size: 12px; color: var(--mint-soft); background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); border-radius: 999px; padding: 3px 10px; margin-top: 10px; }
+      .arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 150px; color: var(--mint); }
+      .arrow .lbl { font-size: 12px; color: var(--slate2); margin-bottom: 6px; text-align: center; line-height: 1.35; }
+      .arrow .ln { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(52,211,153,.15), var(--mint)); position: relative; }
+      .arrow .ln::after { content: "▶"; position: absolute; right: -2px; top: -8px; font-size: 12px; color: var(--mint); }
+      .down { color: var(--red); font-size: 13px; text-align: center; margin: 16px 0 6px; }
+      .stack { margin-top: 34px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; border-top: 1px solid var(--line); padding-top: 24px; }
+      .stack .k { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--slate); margin-right: 6px; }
+      .chip { font-size: 13px; color: var(--slate2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; }
+      .chip b { color: var(--white); font-weight: 600; }
+      .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+    </style>
+  </head>
+  <body>
+    <div class="head">
+      <div class="kicker">Casproof · architecture</div>
+      <h1>Verifiable proof of AI agent outputs <span class="grad">on Casper</span></h1>
+      <div class="sub">A producer agent attests an AI output on-chain; a consumer agent verifies it before paying. Tamper the feed → the payout blocks.</div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div class="tag">Producer agent</div>
+        <div class="title">Prices an RWA</div>
+        <div class="desc">An AI agent (Anthropic) values a tokenized real-world asset and fingerprints the output with BLAKE2b-256.</div>
+        <span class="pill">model · prompt · payload</span>
+      </div>
+      <div class="arrow">
+        <div class="lbl"><b>attest(</b>hash, model,<br/>prompt<b>)</b><br/><span class="mono" style="color:var(--mint-soft)">real testnet tx</span></div>
+        <div class="ln"></div>
+      </div>
+      <div class="card mint">
+        <div class="tag">AttestationRegistry</div>
+        <div class="title">Odra → WASM · testnet</div>
+        <div class="desc">Trusted-signer-gated registry. Stores output_hash → {signer, model, time} and emits OutputAttested.</div>
+        <span class="pill">on-chain trust enforced</span>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="card">
+        <div class="tag">Consumer agent</div>
+        <div class="title">DeFi payout</div>
+        <div class="desc">Recomputes the hash and looks it up. Releases funds only if attested by a trusted signer.</div>
+      </div>
+      <div class="arrow">
+        <div class="lbl">verify · reads contract state<br/><span class="mono" style="color:var(--mint-soft)">RPC · or x402-metered</span></div>
+        <div class="ln" style="background: linear-gradient(90deg, var(--mint), rgba(52,211,153,.15));"></div>
+      </div>
+      <div class="card">
+        <div class="tag">Interfaces</div>
+        <div class="title">MCP · x402 · dashboard</div>
+        <div class="desc">Agents discover attest/verify over <b>MCP</b>; reads are metered with <b>x402</b>; humans use the <b>CSPR.click</b> dashboard.</div>
+      </div>
+    </div>
+
+    <div class="down">▼ genuine feed → PROCEED &nbsp;·&nbsp; poisoned feed (different hash) → <b>BLOCK, payout refused</b></div>
+
+    <div class="stack">
+      <span class="k">Built on the Casper stack</span>
+      <span class="chip"><b>Odra</b> contract</span>
+      <span class="chip"><b>casper-js-sdk</b> agents</span>
+      <span class="chip"><b>x402</b> metered reads</span>
+      <span class="chip"><b>MCP</b> agent discovery</span>
+      <span class="chip"><b>CSPR.click</b> wallet</span>
+    </div>
+  </body>
+</html>

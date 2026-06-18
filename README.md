@@ -45,7 +45,7 @@ This is exactly the pattern Casper's AI toolkit is built around — *agents disc
 
 | Path | What it is |
 |---|---|
-| `contract/` | `AttestationRegistry` — an [Odra](https://odra.dev) (Rust → WASM) smart contract for Casper. Trusted-signer-gated `attest`, `verify`, owner-managed allow-list. |
+| `contract/` | `AttestationRegistry` — an [Odra](https://odra.dev) (Rust → WASM) smart contract for Casper. Trusted-signer-gated `attest`, `verify`, owner-managed allow-list, and on-chain signer `reputation`. |
 | `agents/` | TypeScript producer + consumer agents, the on-chain read library, the x402 verify server, the **MCP server**, and the keygen/deploy/resolve scripts (`casper-js-sdk` v5, Anthropic API). |
 | `ui/` | Next.js dashboard (CSPR.click wallet connect) — verify an output, show the attestation badge + explorer link, and the live poison→block contrast screen. |
 
@@ -127,7 +127,7 @@ npm run dev                      # http://localhost:3000
 
 ## Long-term impact
 
-Casper wants to be the trust layer for the agent economy. As agents increasingly transact on each other's outputs, "is this output the genuine model result, from a source I trust?" becomes a settlement-critical question. Casproof makes that a one-call, on-chain primitive — and by exposing it over MCP and metering it with x402, it becomes infrastructure other Casper agents build on rather than a single app. Natural extensions: portable agent reputation derived from attestation history, attestation of reasoning traces (not just final outputs), multi-signer quorums for high-value feeds, and attestation expiry for time-sensitive valuations.
+Casper wants to be the trust layer for the agent economy. As agents increasingly transact on each other's outputs, "is this output the genuine model result, from a source I trust?" becomes a settlement-critical question. Casproof makes that a one-call, on-chain primitive — and by exposing it over MCP and metering it with x402, it becomes infrastructure other Casper agents build on rather than a single app. The registry already tracks portable signer **reputation** (attestation count per signer) on-chain; natural extensions: reputation-weighted trust, attestation of reasoning traces (not just final outputs), multi-signer quorums for high-value feeds, and attestation expiry for time-sensitive valuations.
 
 ## License
 

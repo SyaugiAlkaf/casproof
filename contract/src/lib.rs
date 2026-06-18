@@ -32,6 +32,7 @@ pub struct AttestationRegistry {
     owner: Var<Address>,
     attestations: Mapping<String, Attestation>,
     trusted: Mapping<Address, bool>,
+    attestation_count: Mapping<Address, u64>,
 }
 
 #[odra::module]
@@ -60,6 +61,7 @@ impl AttestationRegistry {
                 timestamp,
             },
         );
+        self.attestation_count.add(&signer, 1);
         self.env().emit_event(OutputAttested {
             output_hash,
             model_id,
@@ -74,6 +76,11 @@ impl AttestationRegistry {
 
     pub fn is_trusted(&self, signer: Address) -> bool {
         self.trusted.get(&signer).unwrap_or(false)
+    }
+
+    // Portable agent reputation: how many outputs this signer has attested.
+    pub fn reputation(&self, signer: Address) -> u64 {
+        self.attestation_count.get(&signer).unwrap_or(0)
     }
 
     pub fn set_trusted(&mut self, signer: Address, trusted: bool) {
@@ -153,6 +160,17 @@ mod tests {
         env.set_caller(env.get_account(1));
         let res = registry.try_attest("h".into(), "m".into(), "p".into());
         assert_eq!(res, Err(Error::NotTrusted.into()));
+    }
+
+    #[test]
+    fn reputation_counts_a_signers_attestations() {
+        let env = odra_test::env();
+        let mut registry = AttestationRegistry::deploy(&env, NoArgs);
+        let owner = env.get_account(0);
+        assert_eq!(registry.reputation(owner), 0);
+        registry.attest("a".into(), "m".into(), "p".into());
+        registry.attest("b".into(), "m".into(), "p".into());
+        assert_eq!(registry.reputation(owner), 2);
     }
 
     #[test]

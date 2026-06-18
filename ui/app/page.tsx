@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import HeroVerify from "@/components/HeroVerify";
 import PoisonDemo from "@/components/PoisonDemo";
 import HowItWorks from "@/components/HowItWorks";
+import CasperStack from "@/components/CasperStack";
 
 const REPO_URL = "https://github.com/SyaugiAlkaf/casproof";
 
@@ -38,6 +39,8 @@ export default function Page() {
         <div className="mt-16">
           <HowItWorks />
         </div>
+
+        <CasperStack />
       </main>
 
       <Footer />

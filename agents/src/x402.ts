@@ -7,9 +7,10 @@ const PAY_TO = process.env.X402_PAY_TO ?? "";
 const ASSET = process.env.X402_ASSET ?? "CSPR";
 const PRICE_MOTES = process.env.X402_PRICE_MOTES ?? "100000000";
 
-// "live" settles each read through the hosted Casper facilitator; "sim" runs the
-// 402 handshake locally for development. The verification read it gates is always real.
-export const X402_MODE = (process.env.X402_MODE ?? "live").toLowerCase();
+// "live" settles each read through the hosted Casper facilitator (requires the Casper
+// x402 payment signer + a CSPR.cloud key); "sim" runs the 402 handshake locally and is
+// the default so the reference demo works out of the box. The read it gates is always real.
+export const X402_MODE = (process.env.X402_MODE ?? "sim").toLowerCase();
 export const X402_VERSION = 1;
 
 export interface PaymentRequirements {

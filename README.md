@@ -27,6 +27,10 @@ The registry **gates `attest()` to trusted signers on-chain** — an untrusted c
 
 The consumer reads the attestation **straight from the contract's state in the node** (no indexer, no API key required), by re-deriving the Odra storage key for the registry's `attestations` mapping and querying the dictionary item over RPC. CSPR.cloud's event index is supported as a fallback.
 
+### On-chain enforcement — the verify-gate
+
+An off-chain consumer is convenient, but it's just software that could be patched to skip the check. So Casproof also ships **`PayoutVault`**, a second Casper contract whose `release(output_hash)` **cross-calls the registry's `verify()` inside the VM** and reverts (`NotAttested`) for a tampered or unattested feed. The verify-before-act decision is enforced by the Casper VM — not by any off-chain process. A poisoned feed produces an **on-chain revert** visible on the explorer; no agent can override it. Two interacting contracts, two transaction types, one unfakeable trust guarantee.
+
 ### Metered verification (x402)
 
 Verification can be sold per-read. The `/verify` endpoint is paywalled with [x402](https://x402.org): an unpaid request gets `402 Payment Required` with Casper payment requirements (`casper:casper-test`); the client attaches an `X-PAYMENT` header; the request is settled through the hosted Casper facilitator (`x402-facilitator.cspr.cloud`); only then does the endpoint perform the real on-chain read. An oracle operator earns per verified read while agents pay only for what they consume.
@@ -47,7 +51,7 @@ This is exactly the pattern Casper's AI toolkit is built around — *agents disc
 
 | Path | What it is |
 |---|---|
-| `contract/` | `AttestationRegistry` — an [Odra](https://odra.dev) (Rust → WASM) smart contract for Casper. Trusted-signer-gated `attest`, `verify`, owner-managed allow-list, and on-chain signer `reputation`. |
+| `contract/` | Two [Odra](https://odra.dev) (Rust → WASM) contracts: `AttestationRegistry` (trusted-signer-gated `attest`, `verify`, allow-list, on-chain `reputation`) and **`PayoutVault`** — a DeFi consumer that cross-calls `verify()` on-chain and reverts unless the output is attested. |
 | `agents/` | TypeScript producer + consumer agents, the on-chain read library, the x402 verify server, the **MCP server**, and the keygen/deploy/resolve scripts (`casper-js-sdk` v5, Anthropic API). |
 | `ui/` | Next.js dashboard (CSPR.click wallet connect) — verify an output, show the attestation badge + explorer link, and the live poison→block contrast screen. |
 
@@ -78,11 +82,14 @@ npm run keygen                   # generate a fresh ed25519 key → keys/produce
 #   → fund the printed public key once at https://testnet.cspr.live/tools/faucet
 
 npm run deploy                   # install the registry on testnet (uses PRODUCER_KEY_PATH)
-npm run resolve                  # print REGISTRY_CONTRACT_HASH from your account's named keys
-#   → paste it into .env
+npm run resolve                  # print REGISTRY_CONTRACT_HASH + REGISTRY_PACKAGE_HASH
+#   → paste both into .env
+
+npm run deploy:vault             # install PayoutVault wired to the registry (needs REGISTRY_PACKAGE_HASH)
+npm run resolve:vault            # print VAULT_CONTRACT_HASH → paste into .env
 
 npm run producer                 # produce an RWA valuation + attest it on-chain (prints tx + explorer link)
-npm run demo                     # full story: genuine feed → PAY, poisoned feed → BLOCK
+npm run demo                     # genuine → PAY, poisoned → BLOCK, plus the on-chain vault gate (authorize vs revert)
 npm test                         # unit tests (+ a deploy-gated integration test)
 ```
 

@@ -61,23 +61,24 @@
     </div>
 
     <div class="row">
-      <div class="card">
-        <div class="tag">Consumer agent</div>
-        <div class="title">DeFi payout</div>
-        <div class="desc">Recomputes the hash and looks it up. Releases funds only if attested by a trusted signer.</div>
+      <div class="card mint">
+        <div class="tag">PayoutVault · Odra → WASM</div>
+        <div class="title">On-chain verify-gate</div>
+        <div class="desc">A DeFi consumer contract. <b>release()</b> cross-calls the registry's verify() <b>inside the Casper VM</b> and reverts if unattested — no off-chain agent can skip the check.</div>
+        <span class="pill">VM-enforced trust</span>
       </div>
       <div class="arrow">
-        <div class="lbl">verify · reads contract state<br/><span class="mono" style="color:var(--mint-soft)">RPC · or x402-metered</span></div>
+        <div class="lbl">verify(hash)<br/><span class="mono" style="color:var(--mint-soft)">on-chain cross-call</span></div>
         <div class="ln" style="background: linear-gradient(90deg, var(--mint), rgba(52,211,153,.15));"></div>
       </div>
       <div class="card">
         <div class="tag">Interfaces</div>
         <div class="title">MCP · x402 · dashboard</div>
-        <div class="desc">Agents discover attest/verify over <b>MCP</b>; reads are metered with <b>x402</b>; humans use the <b>CSPR.click</b> dashboard.</div>
+        <div class="desc">Agents discover attest/verify over <b>MCP</b>; off-chain reads are metered with <b>x402</b>; humans use the <b>CSPR.click</b> dashboard.</div>
       </div>
     </div>
 
-    <div class="down">▼ genuine feed → PROCEED &nbsp;·&nbsp; poisoned feed (different hash) → <b>BLOCK, payout refused</b></div>
+    <div class="down">▼ genuine feed → release AUTHORIZED &nbsp;·&nbsp; poisoned feed (different hash) → <b>on-chain REVERT, payout refused by the VM</b></div>
 
     <div class="stack">
       <span class="k">Built on the Casper stack</span>

@@ -1,2 +1,5 @@
 [[contracts]]
 fqn = "casproof_contract::AttestationRegistry"
+
+[[contracts]]
+fqn = "casproof_contract::PayoutVault"

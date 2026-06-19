@@ -1,5 +1,3 @@
-WASM = wasm/AttestationRegistry.wasm
-
 .PHONY: test build optimize clean
 
 test:
@@ -10,8 +8,9 @@ build:
 	$(MAKE) optimize
 
 optimize:
-	wasm-opt -Oz --strip-debug $(WASM) -o $(WASM)
-	@echo "optimized wasm: $$(wc -c < $(WASM)) bytes"
+	@for w in wasm/*.wasm; do \
+		wasm-opt -Oz --strip-debug $$w -o $$w && echo "optimized $$w: $$(wc -c < $$w) bytes"; \
+	done
 
 clean:
 	cargo odra clean

@@ -25,6 +25,7 @@ pub enum Error {
     NotOwner = 1,
     AlreadyAttested = 2,
     NotTrusted = 3,
+    NotAttested = 4,
 }
 
 #[odra::module(events = [OutputAttested])]
@@ -91,6 +92,52 @@ impl AttestationRegistry {
     fn assert_owner(&self) {
         if self.env().caller() != self.owner.get().unwrap_or_revert(&self.env()) {
             self.env().revert(Error::NotOwner);
+        }
+    }
+}
+
+// The registry as seen from another contract: PayoutVault calls these on-chain.
+#[odra::external_contract]
+pub trait Registry {
+    fn verify(&self, output_hash: String) -> Option<Attestation>;
+    fn reputation(&self, signer: Address) -> u64;
+}
+
+#[odra::event]
+pub struct PayoutAuthorized {
+    pub output_hash: String,
+    pub beneficiary: Address,
+    pub signer: Address,
+    pub reputation: u64,
+}
+
+// A DeFi consumer contract. It releases a payout only if the output is attested on
+// the registry — the verify-before-act decision runs in the Casper VM, so no off-chain
+// agent can skip it. A tampered feed (different hash) is unattested and reverts.
+#[odra::module(events = [PayoutAuthorized])]
+pub struct PayoutVault {
+    registry: External<RegistryContractRef>,
+}
+
+#[odra::module]
+impl PayoutVault {
+    pub fn init(&mut self, registry: Address) {
+        self.registry.set(registry);
+    }
+
+    pub fn release(&mut self, output_hash: String, beneficiary: Address) -> u64 {
+        match self.registry.verify(output_hash.clone()) {
+            None => self.env().revert(Error::NotAttested),
+            Some(attestation) => {
+                let reputation = self.registry.reputation(attestation.signer);
+                self.env().emit_event(PayoutAuthorized {
+                    output_hash,
+                    beneficiary,
+                    signer: attestation.signer,
+                    reputation,
+                });
+                reputation
+            }
         }
     }
 }
@@ -182,5 +229,43 @@ mod tests {
         env.set_caller(oracle);
         registry.attest("h".into(), "m".into(), "p".into());
         assert_eq!(registry.verify("h".into()).unwrap().signer, oracle);
+    }
+
+    fn deploy_pair(env: &odra::host::HostEnv) -> (AttestationRegistryHostRef, PayoutVaultHostRef) {
+        let registry = AttestationRegistry::deploy(env, NoArgs);
+        let vault = PayoutVault::deploy(env, PayoutVaultInitArgs { registry: registry.address() });
+        (registry, vault)
+    }
+
+    #[test]
+    fn vault_authorizes_release_for_attested_output() {
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.attest("h".into(), "claude-opus-4-8".into(), "p".into());
+        let beneficiary = env.get_account(1);
+        let reputation = vault.release("h".into(), beneficiary);
+        assert_eq!(reputation, 1);
+    }
+
+    #[test]
+    fn vault_reverts_release_for_unattested_output() {
+        let env = odra_test::env();
+        let (_registry, mut vault) = deploy_pair(&env);
+        let beneficiary = env.get_account(1);
+        let res = vault.try_release("never-attested".into(), beneficiary);
+        assert_eq!(res, Err(Error::NotAttested.into()));
+    }
+
+    #[test]
+    fn vault_blocks_a_poisoned_feed() {
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.attest("genuine".into(), "m".into(), "p".into());
+        let beneficiary = env.get_account(1);
+        assert!(vault.try_release("genuine".into(), beneficiary).is_ok());
+        assert_eq!(
+            vault.try_release("poisoned".into(), beneficiary),
+            Err(Error::NotAttested.into())
+        );
     }
 }

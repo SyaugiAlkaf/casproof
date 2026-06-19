@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { produceFeed } from "./producer.js";
 import { outputHash, promptHash } from "./attest.js";
-import { attest, findAttestation, loadKey, explorerTxUrl } from "./casper.js";
+import { attest, findAttestation, loadKey, explorerTxUrl, releaseVault } from "./casper.js";
 import { verify, releasePayout } from "./consumer.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -41,6 +41,18 @@ async function main() {
   console.log("   poisoned hash:", outputHash(poisoned));
   const bad = await verify(poisoned);
   console.log("  ", bad.ok ? `PASS → ${releasePayout(poisoned)}` : `BLOCK → ${bad.reason}`);
+
+  if (process.env.VAULT_CONTRACT_HASH) {
+    console.log("\n5. on-chain verify-gate: a DeFi vault releases only if the registry confirms it");
+    const beneficiary = key.publicKey.accountHash().toPrefixedString();
+    const authorized = await releaseVault(key, oh, beneficiary);
+    console.log("   genuine  →", authorized.authorized ? "PAYOUT AUTHORIZED" : `unexpected revert: ${authorized.reason}`);
+    console.log("   tx       :", authorized.explorer);
+    const blocked = await releaseVault(key, outputHash(poisoned), beneficiary);
+    console.log("   poisoned →", blocked.authorized ? "UNEXPECTED PAYOUT" : "REVERTED on-chain (NotAttested)");
+    console.log("   tx       :", blocked.explorer);
+    console.log("   the Casper VM refused the payout — no off-chain agent could override it.");
+  }
 
   console.log("\n──────────────────────────────────────────────────────────");
   if (good.ok && !bad.ok) {

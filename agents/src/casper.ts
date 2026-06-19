@@ -8,6 +8,7 @@ const {
   HttpHandler,
   PrivateKey,
   KeyAlgorithm,
+  Key,
   Args,
   CLValue,
   ContractCallBuilder,
@@ -22,6 +23,8 @@ const CONTRACT_HASH = (process.env.REGISTRY_CONTRACT_HASH ?? "").replace(/^(hash
 const CSPR_CLOUD = process.env.CSPR_CLOUD_BASE ?? "https://api.testnet.cspr.cloud";
 const CSPR_CLOUD_KEY = process.env.CSPR_CLOUD_API_KEY ?? "";
 const ATTEST_PAYMENT = Number(process.env.ATTEST_PAYMENT_MOTES ?? 3_000_000_000);
+const VAULT_HASH = (process.env.VAULT_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
+const VAULT_PAYMENT = Number(process.env.VAULT_PAYMENT_MOTES ?? 5_000_000_000);
 const EXPLORER = process.env.EXPLORER_BASE ?? "https://testnet.cspr.live";
 const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
   .split(",")
@@ -82,6 +85,45 @@ export async function attest(
     throw new Error(`attest reverted on-chain: ${result.errorMessage} (tx ${txHash})`);
   }
   return { txHash, cost: Number(result?.consumed ?? 0), explorer: explorerTxUrl(txHash) };
+}
+
+export interface VaultReleaseResult {
+  txHash: string;
+  authorized: boolean;
+  reason?: string;
+  explorer: string;
+}
+
+// Calls PayoutVault.release on-chain. The vault cross-calls the registry's verify()
+// inside the Casper VM: an attested output authorizes the payout; a poisoned/unattested
+// output reverts (NotAttested). Either way this produces a real testnet transaction.
+export async function releaseVault(
+  key: PrivateKey,
+  outputHash: string,
+  beneficiaryAccountHash: string
+): Promise<VaultReleaseResult> {
+  if (!NODE_URL) throw new Error("CASPER_CHAIN_RPC / CASPER_NODE_URL not set");
+  if (!VAULT_HASH) throw new Error("VAULT_CONTRACT_HASH not set — deploy the vault first");
+  const tx = new ContractCallBuilder()
+    .byHash(VAULT_HASH)
+    .entryPoint("release")
+    .runtimeArgs(
+      Args.fromMap({
+        output_hash: CLValue.newCLString(outputHash),
+        beneficiary: CLValue.newCLKey(Key.newKey(beneficiaryAccountHash)),
+      })
+    )
+    .from(key.publicKey)
+    .chainName(NETWORK)
+    .payment(VAULT_PAYMENT)
+    .build();
+  tx.sign(key);
+
+  const res = await rpc.putTransaction(tx);
+  const txHash = hashHex(res.transactionHash);
+  const info = await rpc.waitForTransaction(tx, 180_000);
+  const error = info.executionInfo?.executionResult?.errorMessage;
+  return { txHash, authorized: !error, reason: error ?? undefined, explorer: explorerTxUrl(txHash) };
 }
 
 export interface AttestationRecord {

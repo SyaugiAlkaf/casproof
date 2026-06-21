@@ -8,108 +8,156 @@
         --mint: #34d399; --mint-soft: #5eead4; --red: #f87171; --slate: #94a3b8; --slate2: #cbd5e1; --white: #e6edf6;
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Inter, sans-serif; }
-      body { width: 1280px; background: radial-gradient(120% 90% at 50% -10%, rgba(45,212,191,0.10), var(--ink) 55%); color: var(--white); padding: 40px 64px; }
-      .head { margin-bottom: 22px; }
-      .kicker { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; }
-      h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; }
+      body { width: 1280px; background: radial-gradient(120% 90% at 50% -10%, rgba(45,212,191,0.10), var(--ink) 55%); color: var(--white); padding: 26px 64px 24px; }
+      .head { margin-bottom: 10px; }
+      .kicker { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--slate); margin-bottom: 6px; }
+      h1 { font-size: 26px; font-weight: 650; letter-spacing: -0.02em; }
       h1 .grad { background: linear-gradient(90deg, var(--mint-soft), var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-      .sub { color: var(--slate); font-size: 15px; margin-top: 8px; line-height: 1.5; }
-      .row { display: flex; align-items: stretch; gap: 18px; margin-top: 14px; }
-      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px; flex: 1; box-shadow: 0 24px 60px -36px rgba(0,0,0,.9); }
+      .sub { color: var(--slate); font-size: 14px; margin-top: 7px; line-height: 1.45; max-width: 1080px; }
+      .row { display: flex; align-items: stretch; gap: 16px; margin-top: 10px; }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 12px 16px; flex: 1; box-shadow: 0 24px 60px -36px rgba(0,0,0,.9); }
       .card.mint { border-color: rgba(52,211,153,.35); box-shadow: 0 0 0 1px rgba(94,234,212,.12), 0 24px 80px -32px rgba(45,212,191,.30); }
       .card.red { border-color: rgba(248,113,113,.35); }
       .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
-      .title { font-size: 18px; font-weight: 600; margin: 6px 0 4px; }
-      .desc { font-size: 13px; color: var(--slate); line-height: 1.5; }
-      .pill { display: inline-block; font-size: 12px; color: var(--mint-soft); background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); border-radius: 999px; padding: 3px 10px; margin-top: 10px; }
+      .title { font-size: 17px; font-weight: 600; margin: 6px 0 4px; }
+      .desc { font-size: 12.5px; color: var(--slate); line-height: 1.5; }
+      .pill { display: inline-block; font-size: 12px; color: var(--mint-soft); background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); border-radius: 999px; padding: 3px 10px; margin-top: 9px; }
       .pill.red { color: var(--red); background: rgba(248,113,113,.07); border-color: rgba(248,113,113,.28); }
-      .arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 150px; color: var(--mint); }
+      .arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 132px; color: var(--mint); }
       .arrow .lbl { font-size: 12px; color: var(--slate2); margin-bottom: 6px; text-align: center; line-height: 1.35; }
       .arrow .ln { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(52,211,153,.15), var(--mint)); position: relative; }
       .arrow .ln::after { content: "▶"; position: absolute; right: -2px; top: -8px; font-size: 12px; color: var(--mint); }
-      .down { color: var(--mint); font-size: 18px; text-align: center; margin: 10px 0 4px; }
-      .stack { margin-top: 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; border-top: 1px solid var(--line); padding-top: 20px; }
+      .down { color: var(--mint); font-size: 14px; text-align: center; margin: 3px 0 1px; }
+      .stack { margin-top: 14px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; border-top: 1px solid var(--line); padding-top: 13px; }
       .stack .k { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--slate); margin-right: 6px; }
       .chip { font-size: 13px; color: var(--slate2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; }
       .chip b { color: var(--white); font-weight: 600; }
       .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
-      .panel { flex: 1; border: 1px dashed rgba(52,211,153,.30); border-radius: 16px; padding: 12px 14px; background: rgba(52,211,153,.03); }
-      .panel .ptag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; }
-      .agents { display: flex; flex-direction: column; gap: 8px; }
-      .agent { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; }
-      .agent .nm { font-size: 14px; font-weight: 600; }
+      .panel { flex: 1; border: 1px dashed rgba(52,211,153,.30); border-radius: 16px; padding: 10px 13px; background: rgba(52,211,153,.03); }
+      .panel .ptag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); margin-bottom: 7px; }
+      .agents { display: flex; flex-direction: column; gap: 5px; }
+      .agent { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 6px 11px; }
+      .agent .nm { font-size: 13px; font-weight: 600; }
       .agent .nm .mono { color: var(--mint-soft); font-weight: 600; }
-      .agent .dl { font-size: 12px; color: var(--slate); margin-top: 2px; line-height: 1.45; }
-      .verdict { display: flex; gap: 12px; margin-top: 12px; }
-      .verdict .v { flex: 1; border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4; }
+      .agent .dl { font-size: 11px; color: var(--slate); margin-top: 1px; line-height: 1.35; }
+      .verdict { display: flex; gap: 12px; margin-top: 10px; }
+      .verdict .v { flex: 1; border-radius: 12px; padding: 9px 13px; font-size: 12.5px; line-height: 1.4; }
       .verdict .v.pay { border: 1px solid rgba(52,211,153,.35); background: rgba(52,211,153,.06); color: var(--mint-soft); }
       .verdict .v.rev { border: 1px solid rgba(248,113,113,.35); background: rgba(248,113,113,.06); color: var(--red); }
       .verdict .v b { font-weight: 700; }
-      .poison { color: var(--red); font-size: 13px; text-align: center; margin-top: 12px; }
+      .poison { color: var(--red); font-size: 12.5px; text-align: center; margin-top: 8px; }
+
+      .gate { position: relative; border: 1px solid rgba(94,234,212,.45); border-radius: 18px; padding: 12px 16px 13px; margin-top: 8px;
+        background: linear-gradient(180deg, rgba(52,211,153,.08), rgba(52,211,153,.02));
+        box-shadow: 0 0 0 1px rgba(94,234,212,.10), 0 30px 90px -38px rgba(45,212,191,.40); }
+      .gate .gtag { font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--mint-soft); }
+      .gate .gtitle { font-size: 18px; font-weight: 650; letter-spacing: -0.01em; margin: 3px 0 2px; }
+      .gate .gtitle .grad { background: linear-gradient(90deg, var(--mint-soft), var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+      .gate .gsub { font-size: 12px; color: var(--slate2); line-height: 1.4; max-width: 1000px; }
+      .atomic { display: flex; align-items: stretch; gap: 14px; margin-top: 10px; }
+      .atomic .seg { flex: 1; background: var(--card); border: 1px solid var(--line); border-radius: 13px; padding: 9px 12px; }
+      .atomic .seg.call { border-color: rgba(52,211,153,.30); }
+      .atomic .seg .sname { font-size: 13px; font-weight: 600; }
+      .atomic .seg .scode { font-family: ui-monospace, SFMono-Regular, monospace; font-size: 11.5px; color: var(--mint-soft); margin-top: 4px; line-height: 1.45; }
+      .atomic .seg .sdesc { font-size: 11px; color: var(--slate); margin-top: 4px; line-height: 1.35; }
+      .atomic .branch { display: flex; flex-direction: column; gap: 8px; min-width: 252px; }
+      .atomic .branch .b { border-radius: 12px; padding: 8px 12px; font-size: 12px; line-height: 1.35; }
+      .atomic .branch .b.ok { border: 1px solid rgba(52,211,153,.40); background: rgba(52,211,153,.07); color: var(--mint-soft); }
+      .atomic .branch .b.no { border: 1px solid rgba(248,113,113,.40); background: rgba(248,113,113,.07); color: var(--red); }
+      .atomic .branch .b b { font-weight: 700; }
+      .atomic .branch .b .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .glink { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 44px; color: var(--mint); font-size: 16px; }
+
+      .policy { margin-top: 10px; border-top: 1px dashed rgba(94,234,212,.22); padding-top: 9px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+      .policy .plabel { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--slate); line-height: 1.5; }
+      .policy .plabel b { color: var(--mint-soft); font-weight: 600; }
+      .pchip { font-size: 12px; border-radius: 999px; padding: 5px 12px; line-height: 1.3; }
+      .pchip.live { color: var(--mint-soft); background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.35); }
+      .pchip.live b { color: var(--white); font-weight: 600; }
+      .pchip.soon { color: var(--slate); background: rgba(148,163,184,.05); border: 1px dashed rgba(148,163,184,.30); }
+      .pchip.soon .rd { font-size: 9.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); margin-left: 6px; opacity: .85; }
+
+      .honest { margin-top: 9px; border: 1px solid rgba(248,113,113,.26); background: rgba(248,113,113,.045); border-radius: 13px; padding: 8px 13px; }
+      .honest .ht { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--red); margin-bottom: 3px; }
+      .honest .hb { font-size: 11.5px; color: var(--slate2); line-height: 1.45; }
+      .honest .hb b { color: var(--white); font-weight: 600; }
     </style>
   </head>
   <body>
     <div class="head">
       <div class="kicker">Casproof · architecture</div>
-      <h1>Multi-model <span class="grad">quorum</span> proof of AI outputs on Casper</h1>
-      <div class="sub">k of n independent model agents must attest the byte-identical hash before the vault pays. Tamper one model → no quorum → the payout reverts in the Casper VM.</div>
+      <h1>The unskippable on-chain <span class="grad">action firewall</span> for AI agents</h1>
+      <div class="sub">Verify-before-act, enforced in the Casper VM: the verify decision and the value-bearing action run in ONE atomic call, so an off-chain agent cannot skip the check. The proof of computation is pluggable; the unskippable settlement gate is the contribution.</div>
     </div>
 
-    <div class="row">
-      <div class="panel">
-        <div class="ptag">Multi-model producer panel · independent keys</div>
-        <div class="agents">
-          <div class="agent">
-            <div class="nm"><span class="mono">claude-opus-4-8</span></div>
-            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
-          </div>
-          <div class="agent">
-            <div class="nm"><span class="mono">claude-sonnet-4-6</span></div>
-            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
-          </div>
-          <div class="agent">
-            <div class="nm"><span class="mono">claude-haiku-4-5</span></div>
-            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
-          </div>
+    <div class="gate">
+      <div class="gtag">Centrepiece · in-VM enforcement gate</div>
+      <div class="gtitle">Verify + act in <span class="grad">one atomic Casper VM call</span></div>
+      <div class="gsub">Verify-THEN-act off-chain leaves a gap an agent can bypass; Casper's own attestation toolkit attests but has no enforcement primitive. Casproof closes the gap: the consumer cross-calls <span class="mono">registry.require_quorum</span> inside the same transaction that moves value — the action only exists if the check passed.</div>
+
+      <div class="atomic">
+        <div class="seg call">
+          <div class="sname">Consumer contract · value-bearing action</div>
+          <div class="scode">PayoutVault.release(<br/>&nbsp;&nbsp;request_id, output_hash, beneficiary)</div>
+          <div class="sdesc">Composes the guard in-VM before it pays. No human in the trust path.</div>
+        </div>
+        <div class="glink">▶</div>
+        <div class="seg">
+          <div class="sname">Composable guard · AttestationRegistry</div>
+          <div class="scode">require_quorum(<br/>&nbsp;&nbsp;request_id, output_hash) → Address</div>
+          <div class="sdesc">Returns the attesting signer if the output is the quorum result; otherwise reverts <span class="mono">NoQuorum</span>. Any contract cross-calls it atomically.</div>
+        </div>
+        <div class="branch">
+          <div class="b ok"><b>returns signer</b> → action proceeds <span class="mono">→ PAY</span></div>
+          <div class="b no"><b>reverts <span class="mono">NoQuorum</span></b> → tx rolls back <span class="mono">→ REVERT</span></div>
         </div>
       </div>
-      <div class="arrow">
-        <div class="lbl"><b>attest(</b>request_id, hash,<br/>model, prompt_hash<b>)</b><br/><span class="mono" style="color:var(--mint-soft)">real testnet tx (×n)</span></div>
-        <div class="ln"></div>
-      </div>
-      <div class="card mint">
-        <div class="tag">AttestationRegistry</div>
-        <div class="title">Odra → WASM · testnet · quorum-native</div>
-        <div class="desc">Tallies DISTINCT trusted signers per (request_id, hash). Quorum only when k of n attest the SAME hash. Emits QuorumReached. One vote per signer.</div>
-        <span class="pill">deterministic — hash equality, not an LLM vote</span>
+
+      <div class="policy">
+        <div class="plabel">Behind the gate ·<br/><b>one pluggable attestation policy</b></div>
+        <span class="pchip live"><b>Quorum</b> · k independent signers attest the same deterministic valuation · <span class="mono">LIVE</span></span>
+        <span class="pchip soon">TEE remote-attestation receipt <span class="rd">roadmap</span></span>
+        <span class="pchip soon">zkML proof <span class="rd">roadmap</span></span>
+        <span class="pchip soon">optimistic re-execution <span class="rd">roadmap</span></span>
       </div>
     </div>
 
     <div class="down">▼</div>
 
     <div class="row">
-      <div class="card mint">
-        <div class="tag">PayoutVault · Odra → WASM</div>
-        <div class="title">On-chain verify-gate</div>
-        <div class="desc"><b>release(request_id, hash)</b> cross-calls <b>registry.quorum_of()</b> IN THE VM. Authorizes the payout only if hash == the quorum result; otherwise reverts NoQuorum.</div>
-        <span class="pill">trust enforced on-chain</span>
+      <div class="panel">
+        <div class="ptag">Producer policy (today) · k independent signers, independent keys</div>
+        <div class="agents">
+          <div class="agent">
+            <div class="nm"><span class="mono">signer-a</span> <span class="dl" style="display:inline">· deterministic RWA valuation · BLAKE2b-256(canonical JSON)</span></div>
+          </div>
+          <div class="agent">
+            <div class="nm"><span class="mono">signer-b</span> <span class="dl" style="display:inline">· deterministic RWA valuation · BLAKE2b-256(canonical JSON)</span></div>
+          </div>
+          <div class="agent">
+            <div class="nm"><span class="mono">signer-c</span> <span class="dl" style="display:inline">· deterministic RWA valuation · BLAKE2b-256(canonical JSON)</span></div>
+          </div>
+        </div>
       </div>
       <div class="arrow">
-        <div class="lbl">release(request_id, hash)<br/><span class="mono" style="color:var(--mint-soft)">on-chain cross-call</span></div>
-        <div class="ln" style="background: linear-gradient(90deg, var(--mint), rgba(52,211,153,.15));"></div>
+        <div class="lbl"><b>attest(</b>request_id, output_hash,<br/>model_id, prompt_hash<b>)</b><br/><span class="mono" style="color:var(--mint-soft)">testnet tx (×k)</span></div>
+        <div class="ln"></div>
       </div>
-      <div class="card">
-        <div class="tag">Autonomous DeFi consumer · no human in the trust path</div>
-        <div class="title">Polls quorum, calls release</div>
-        <div class="desc">Genuine quorum → PAYOUT. Poisoned / under-quorum → REVERT.</div>
-        <div class="verdict">
-          <div class="v pay"><b>QUORUM → PAY</b></div>
-          <div class="v rev"><b>tampered → NO QUORUM → REVERT</b></div>
-        </div>
+      <div class="card mint">
+        <div class="tag">AttestationRegistry · Odra → WASM · testnet</div>
+        <div class="title">Tallies distinct trusted signers · serves the gate</div>
+        <div class="desc">k of the trusted set must attest the SAME <span class="mono">output_hash</span>, one vote per signer. <b>slash(signer)</b> (owner-only) revokes trust, emits <span class="mono">SignerSlashed</span>; <b>reputation</b> = attestations − slashes, so a caught liar loses standing.</div>
+        <span class="pill">deterministic — hash equality, not an LLM vote</span>
+        <span class="pill red">slashing = skin in the game</span>
       </div>
     </div>
 
-    <div class="poison">Change one byte → different hash → never joins the quorum → release reverts.</div>
+    <div class="poison">Poison the feed: change one byte → different hash → never reaches quorum → <span class="mono">require_quorum</span> reverts → the payout is blocked in the VM.</div>
+
+    <div class="honest">
+      <div class="ht">Honest about today's threat model</div>
+      <div class="hb">The signer set is <b>owner-curated</b> and attestations are <b>not yet bound to proof-of-computation</b> — a curated signer could in principle copy a published hash. Copy-resistance comes from binding attestations to <b>TEE / zk receipts</b> (roadmap policies above); slashing gives the curated set <b>skin in the game</b> today. The novelty is the in-VM enforcement gate, not the inference proof.</div>
+    </div>
 
     <div class="stack">
       <span class="k">Built on the Casper stack</span>

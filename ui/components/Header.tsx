@@ -8,7 +8,7 @@ export default function Header() {
           <Wordmark />
           <div className="hidden h-8 w-px bg-white/8 sm:block" />
           <p className="hidden text-[13px] text-slate-400 sm:block">
-            Verifiable proof of AI agent outputs on Casper
+            Verify-before-act firewall for AI agents on Casper
           </p>
         </div>
         <WalletConnectClient />

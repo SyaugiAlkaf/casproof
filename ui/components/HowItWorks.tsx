@@ -1,8 +1,8 @@
 const STEPS = [
   {
     n: "01",
-    title: "Producer attests",
-    body: "An AI agent hashes its RWA valuation and writes the proof to the AttestationRegistry contract on Casper.",
+    title: "Signers attest",
+    body: "Independent agents hash the same deterministic RWA valuation and attest it to the AttestationRegistry on Casper. Quorum is the policy; the signer set is owner-curated and slashable.",
     glyph: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
         <rect x="4" y="3" width="16" height="18" rx="2.5" stroke="currentColor" strokeWidth="1.6" />
@@ -12,8 +12,8 @@ const STEPS = [
   },
   {
     n: "02",
-    title: "Consumer verifies",
-    body: "A DeFi agent recomputes the hash and reads the registry. Match found → it proceeds to release the payout.",
+    title: "Gate enforces in-VM",
+    body: "The consumer contract composes require_quorum and the payout in one atomic Casper VM call. Hash clears the gate → the release goes through. No off-chain step can skip the check.",
     glyph: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
         <path d="M12 3l7 3v5c0 4-3 6.5-7 8-4-1.5-7-4-7-8V6l7-3Z" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
@@ -23,8 +23,8 @@ const STEPS = [
   },
   {
     n: "03",
-    title: "Poison blocked",
-    body: "Tamper any value and the hash diverges from every attestation. No match → the agent blocks the funds.",
+    title: "Poison reverts",
+    body: "Tamper any value and the hash has no quorum. require_quorum reverts and the whole call reverts with it — the funds never move. A bad signer can be slashed.",
     glyph: (
       <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>
         <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />

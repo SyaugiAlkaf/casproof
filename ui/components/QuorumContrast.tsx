@@ -48,18 +48,24 @@ export default function QuorumContrast() {
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-2 flex items-center gap-2">
-            <Pill tone="neutral">multi-model quorum</Pill>
+            <Pill tone="neutral">action firewall · Casper VM</Pill>
             <Pill tone={liveQuorumConfigured ? "good" : "muted"}>
               {liveQuorumConfigured ? "live chain state" : "illustrative"}
             </Pill>
           </div>
           <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
-            k of n models must agree before the vault pays.
+            The firewall blocking a poisoned output in the Casper VM.
           </h2>
           <p className="mt-1.5 max-w-xl text-sm text-slate-400">
-            Independent model agents each value the same RWA note and attest on-chain. The PayoutVault releases
-            only against the hash that reached quorum. Change one byte and that output has no quorum — the
-            release reverts in the Casper VM.
+            PayoutVault.release composes the registry&apos;s require_quorum guard, so the verify decision and the
+            payout settle in one atomic Casper VM call — an off-chain agent cannot skip the check. The attestation
+            policy here is quorum: k independent signers attest the same deterministic valuation. Change one byte
+            and that output has no quorum, so require_quorum reverts and the release with it.
+          </p>
+          <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-slate-500">
+            Quorum is one pluggable policy behind the gate — TEE remote-attestation receipts and zkML proofs are on
+            the roadmap. Today the trusted signer set is owner-curated and slashing gives it skin in the game;
+            proof-of-computation receipts come next.
           </p>
           {publicConfig.requestId && (
             <p className="mt-2 font-mono text-[11px] text-slate-500">
@@ -75,7 +81,7 @@ export default function QuorumContrast() {
             className="group inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-mint-soft disabled:opacity-70"
           >
             {genuine.loading || poisoned.loading ? <Spinner className="h-4 w-4" /> : <ScaleGlyph />}
-            {genuine.loading || poisoned.loading ? "Reading chain…" : "Check quorum"}
+            {genuine.loading || poisoned.loading ? "Reading chain…" : "Run the gate"}
           </button>
           {ran && (
             <button
@@ -114,7 +120,7 @@ export default function QuorumContrast() {
 
       {!ran && (
         <p className="mt-5 text-center text-xs text-slate-500">
-          Hit <span className="text-slate-300">Check quorum</span> to read both outputs against the registry side
+          Hit <span className="text-slate-300">Run the gate</span> to push both outputs through require_quorum side
           by side.
         </p>
       )}

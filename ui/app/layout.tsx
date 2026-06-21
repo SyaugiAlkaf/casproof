@@ -16,9 +16,9 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Casproof — verifiable proof of AI agent outputs on Casper",
+  title: "Casproof — the unskippable on-chain action firewall for AI agents",
   description:
-    "Producer agents attest AI outputs on the Casper blockchain; consumer DeFi agents verify before releasing a payout. Poison the feed and watch the payout block in real time.",
+    "Casproof runs the verify decision and the value-bearing action in one atomic Casper VM call, so an off-chain agent cannot skip the check. Poison the feed and watch the on-chain release revert in real time.",
   icons: { icon: "/favicon.svg" }
 };
 

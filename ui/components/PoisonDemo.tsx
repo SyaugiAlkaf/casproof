@@ -65,14 +65,15 @@ export default function PoisonDemo() {
         <div>
           <div className="mb-2 flex items-center gap-2">
             <Pill tone="neutral">live demo</Pill>
-            <Pill tone="muted">verify-before-pay</Pill>
+            <Pill tone="muted">verify-before-act</Pill>
           </div>
           <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
-            Poison the feed. Watch the payout block.
+            Poison the feed. Watch the firewall block it.
           </h2>
           <p className="mt-1.5 max-w-xl text-sm text-slate-400">
-            A consumer DeFi agent only releases funds when the output hash is attested on-chain. Tamper one
-            number and its hash no longer matches any attestation — so the agent refuses.
+            The consumer contract releases funds only when the output hash clears the on-chain gate, in the same
+            atomic Casper VM call. Tamper one number and its hash no longer clears the check — so the release
+            reverts and the funds stay put.
           </p>
         </div>
 

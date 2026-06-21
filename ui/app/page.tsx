@@ -17,18 +17,20 @@ export default function Page() {
         <section className="mb-12 max-w-3xl">
           <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint" />
-            Casper testnet · agent-to-agent trust layer
+            Casper testnet · verify-before-act for AI agents
           </div>
           <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-slate-50 sm:text-5xl">
-            Don&apos;t trust an AI output.{" "}
+            The unskippable on-chain{" "}
             <span className="bg-gradient-to-r from-mint-soft to-mint bg-clip-text text-transparent">
-              Verify it on-chain.
-            </span>
+              action firewall
+            </span>{" "}
+            for AI agents.
           </h1>
           <p className="mt-5 max-w-2xl text-balance text-base leading-relaxed text-slate-400 sm:text-lg">
-            Casproof lets a producer agent attest an AI-generated RWA valuation on Casper, and a consumer DeFi
-            agent verify that proof before releasing a payout. Tamper the feed and the payout blocks — provably,
-            in public.
+            Casproof runs the verify decision and the value-bearing action in one atomic Casper VM call, so an
+            off-chain agent cannot skip the check. The proof of computation is pluggable; the unskippable
+            on-chain settlement gate is enforced in the Casper VM. Demo it on an RWA payout: poison the feed and
+            the release reverts — provably, in public.
           </p>
         </section>
 

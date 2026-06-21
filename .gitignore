@@ -45,5 +45,8 @@ dist/
 *.tsbuildinfo
 npm-debug.log*
 
+# --- tooling artifacts ---
+.playwright-mcp/
+
 # --- os ---
 .DS_Store

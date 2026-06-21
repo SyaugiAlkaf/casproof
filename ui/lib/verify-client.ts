@@ -1,6 +1,6 @@
 import type { FeedInput, VerifyResult } from "./types";
 
-export async function verifyFeed(input: { feed?: FeedInput; hash?: string }): Promise<VerifyResult> {
+export async function verifyFeed(input: { feed?: FeedInput; hash?: string; requestId?: string }): Promise<VerifyResult> {
   const res = await fetch("/api/verify", {
     method: "POST",
     headers: { "content-type": "application/json" },

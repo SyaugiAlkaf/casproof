@@ -5,6 +5,7 @@ const { RpcClient, HttpHandler, ParamDictionaryIdentifier, ParamDictionaryIdenti
 
 const NODE_URL = process.env.CASPER_CHAIN_RPC ?? process.env.CASPER_NODE_URL ?? "";
 const CONTRACT_HASH = (process.env.REGISTRY_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
+const VAULT_HASH = (process.env.VAULT_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
 const CSPR_CLOUD = process.env.CSPR_CLOUD_BASE ?? "https://api.testnet.cspr.cloud";
 const CSPR_CLOUD_KEY = process.env.CSPR_CLOUD_API_KEY ?? "";
 const EXPLORER = process.env.EXPLORER_BASE ?? "https://testnet.cspr.live";
@@ -13,10 +14,14 @@ const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// Field index of the `attestations` Mapping inside AttestationRegistry.
-// Declaration order: owner(0), attestations(1), trusted(2). Odra keys each module
-// field by its position, so this must track the struct in contract/src/lib.rs.
-const ATTESTATIONS_FIELD_INDEX = 1;
+// Field indices track the storage-field declaration order in AttestationRegistry
+// (contract/src/lib.rs). Odra keys each module field by its position, so these MUST
+// stay in lockstep with the struct and with agents/src/casper.ts: owner(0),
+// quorum_threshold(1), trusted(2), attestation_count(3), attestations(4),
+// agreement(5), quorum_output(6), voted(7).
+const ATTESTATIONS_FIELD_INDEX = 4;
+const AGREEMENT_FIELD_INDEX = 5;
+const QUORUM_OUTPUT_FIELD_INDEX = 6;
 const STATE_DICTIONARY = "state";
 
 export const rpc = new RpcClient(new HttpHandler(NODE_URL));
@@ -25,15 +30,19 @@ export function contractConfigured(): boolean {
   return Boolean(NODE_URL && CONTRACT_HASH);
 }
 
+export function vaultConfigured(): boolean {
+  return Boolean(VAULT_HASH);
+}
+
 export interface AttestationRecord {
   signer: string;
   source: "chain" | "cspr.cloud";
   raw: unknown;
 }
 
-// Looks up whether `outputHash` is attested on the registry. Primary path reads the
-// contract's state dictionary straight from the node (no indexer, no API key); if that
-// can't resolve and a CSPR.cloud key is configured, it falls back to the events index.
+// Looks up whether `outputHash` has a base attestation on the registry. Primary path
+// reads the contract's state dictionary straight from the node (no indexer, no API key);
+// if that can't resolve and a CSPR.cloud key is configured, it falls back to events.
 export async function findAttestation(outputHash: string): Promise<AttestationRecord | null> {
   try {
     return await readAttestationOnChain(outputHash);
@@ -44,22 +53,41 @@ export async function findAttestation(outputHash: string): Promise<AttestationRe
   }
 }
 
-async function readAttestationOnChain(outputHash: string): Promise<AttestationRecord | null> {
+// The quorum-attested output hash for a request, or null if no output has reached the
+// threshold yet. Reads the quorum_output dictionary directly from the node.
+export async function readQuorum(reqId: string): Promise<string | null> {
+  const stored = await readStateItem(QUORUM_OUTPUT_FIELD_INDEX, reqId);
+  if (stored === null) return null;
+  return parseHashValue(stored);
+}
+
+// How many distinct trusted signers have attested this exact output for this request.
+export async function readAgreement(reqId: string, outputHash: string): Promise<number> {
+  const stored = await readStateItem(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
+  if (stored === null) return 0;
+  return parseNumberValue(stored);
+}
+
+async function readStateItem(fieldIndex: number, key: string): Promise<unknown | null> {
   const seedUref = await resolveStateUref();
-  const itemKey = stateItemKey(ATTESTATIONS_FIELD_INDEX, outputHash);
+  const itemKey = stateItemKey(fieldIndex, key);
   const identifier = new ParamDictionaryIdentifier(
     undefined,
     undefined,
     new ParamDictionaryIdentifierURef(itemKey, seedUref)
   );
-  let stored;
   try {
-    stored = await rpc.getDictionaryItemByIdentifier(null, identifier);
+    return await rpc.getDictionaryItemByIdentifier(null, identifier);
   } catch (e) {
     if (isNotFound(e)) return null;
     throw e;
   }
-  return { signer: extractSigner(stored), source: "chain", raw: stored.rawJSON ?? stored };
+}
+
+async function readAttestationOnChain(outputHash: string): Promise<AttestationRecord | null> {
+  const stored = await readStateItem(ATTESTATIONS_FIELD_INDEX, outputHash);
+  if (stored === null) return null;
+  return { signer: extractSigner(stored), source: "chain", raw: (stored as { rawJSON?: unknown }).rawJSON ?? stored };
 }
 
 let cachedUref: string | undefined;
@@ -84,7 +112,7 @@ async function resolveStateUref(): Promise<string> {
   );
 }
 
-// item key = hex(blake2b256( u32_be(field_index) ++ string_to_bytes(key) )),
+// item key = hex(blake2b256( u32_be(field_index) ++ u32_le(len) ++ string_to_bytes(key) )),
 // mirroring Odra's odra-core contract_env::current_key for a top-level Mapping field.
 export function stateItemKey(fieldIndex: number, key: string): string {
   const idx = Buffer.alloc(4);
@@ -96,6 +124,7 @@ export function stateItemKey(fieldIndex: number, key: string): string {
   return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
 }
 
+// Registry already gates attest() to trusted callers; this optional allow-list narrows trust further (empty = accept any on-chain attestation).
 export function isTrusted(signer: string): boolean {
   if (TRUSTED.length === 0) return true;
   return TRUSTED.includes(signer.toLowerCase());
@@ -135,6 +164,21 @@ function urefOf(res: unknown): string | undefined {
 function extractSigner(stored: unknown): string {
   const m = JSON.stringify(stored).match(/(account-hash-[0-9a-f]{64}|0[12][0-9a-f]{64})/i);
   return m?.[0] ?? "";
+}
+
+// The registry stores a CLString output hash; CLValue JSON carries it under "parsed".
+function parseHashValue(stored: unknown): string | null {
+  const s = JSON.stringify(stored);
+  const parsed = s.match(/"parsed"\s*:\s*"([0-9a-fA-F]{64})"/);
+  if (parsed) return parsed[1].toLowerCase();
+  const any = s.match(/[0-9a-f]{64}/i);
+  return any ? any[0].toLowerCase() : null;
+}
+
+function parseNumberValue(stored: unknown): number {
+  const s = JSON.stringify(stored);
+  const parsed = s.match(/"parsed"\s*:\s*(\d+)/);
+  return parsed ? Number(parsed[1]) : 0;
 }
 
 function isNotFound(e: unknown): boolean {

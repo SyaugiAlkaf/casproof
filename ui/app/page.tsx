@@ -1,6 +1,7 @@
 import Header from "@/components/Header";
 import HeroVerify from "@/components/HeroVerify";
 import PoisonDemo from "@/components/PoisonDemo";
+import QuorumContrast from "@/components/QuorumContrast";
 import HowItWorks from "@/components/HowItWorks";
 import CasperStack from "@/components/CasperStack";
 
@@ -33,6 +34,7 @@ export default function Page() {
 
         <div className="space-y-6">
           <HeroVerify />
+          <QuorumContrast />
           <PoisonDemo />
         </div>
 

@@ -1,13 +1,34 @@
 import { NextResponse } from "next/server";
 import { outputHash, type AgentOutput } from "@/lib/hash";
-import { contractConfigured, findAttestation, isTrusted, explorerContractUrl } from "@/lib/casper";
+import {
+  contractConfigured,
+  findAttestation,
+  isTrusted,
+  explorerContractUrl,
+  readQuorum,
+  readAgreement
+} from "@/lib/casper";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_REQUEST_ID = process.env.REQUEST_ID ?? process.env.NEXT_PUBLIC_REQUEST_ID ?? "";
+// The on-chain threshold is the k that setup.ts wrote with set_quorum; surface it for the
+// display denominator (the PAY/BLOCK decision uses quorum_output, not this number).
+const QUORUM_THRESHOLD = Number(process.env.QUORUM_THRESHOLD ?? process.env.NEXT_PUBLIC_QUORUM_THRESHOLD ?? 0) || 0;
+
 interface VerifyBody {
   feed?: { modelId: string; prompt: string; payload: unknown };
   hash?: string;
+  requestId?: string;
+}
+
+interface QuorumInfo {
+  reached: boolean;
+  winningHash: string | null;
+  agreement: number;
+  threshold: number;
+  matchesWinner: boolean;
 }
 
 interface VerifyResponse {
@@ -17,6 +38,7 @@ interface VerifyResponse {
   trusted?: boolean;
   source?: "chain" | "cspr.cloud";
   explorer?: string;
+  quorum?: QuorumInfo;
   note?: string;
   error?: string;
 }
@@ -45,20 +67,21 @@ export async function POST(req: Request) {
     return NextResponse.json(res);
   }
 
+  const reqId = (body.requestId ?? DEFAULT_REQUEST_ID).trim();
+
   try {
-    const record = await findAttestation(hash);
-    if (!record) {
-      const res: VerifyResponse = { hash, attested: false };
-      return NextResponse.json(res);
-    }
+    const [record, quorum] = await Promise.all([findAttestation(hash), readQuorumInfo(reqId, hash)]);
     const res: VerifyResponse = {
       hash,
-      attested: true,
-      signer: record.signer,
-      trusted: isTrusted(record.signer),
-      source: record.source,
-      explorer: explorerContractUrl()
+      attested: Boolean(record),
+      explorer: explorerContractUrl(),
+      ...(quorum ? { quorum } : {})
     };
+    if (record) {
+      res.signer = record.signer;
+      res.trusted = isTrusted(record.signer);
+      res.source = record.source;
+    }
     return NextResponse.json(res);
   } catch (e) {
     const res: VerifyResponse = {
@@ -68,6 +91,18 @@ export async function POST(req: Request) {
     };
     return NextResponse.json(res);
   }
+}
+
+async function readQuorumInfo(reqId: string, hash: string): Promise<QuorumInfo | undefined> {
+  if (!reqId) return undefined;
+  const [winningHash, agreement] = await Promise.all([readQuorum(reqId), readAgreement(reqId, hash)]);
+  return {
+    reached: winningHash !== null,
+    winningHash,
+    agreement,
+    threshold: QUORUM_THRESHOLD,
+    matchesWinner: winningHash !== null && winningHash === hash
+  };
 }
 
 function resolveHash(body: VerifyBody): string | null {

@@ -145,6 +145,11 @@ export default function HeroVerify() {
 
               {attested && (
                 <div className="flex flex-col items-start gap-2 sm:items-end">
+                  {result.quorum && result.quorum.threshold > 0 && (
+                    <Pill tone={result.quorum.reached && result.quorum.matchesWinner ? "good" : "neutral"}>
+                      {result.quorum.agreement} / {result.quorum.threshold} models agree
+                    </Pill>
+                  )}
                   {result.signer && (
                     <div className="text-right">
                       <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">signer</div>

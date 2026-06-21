@@ -8,85 +8,116 @@
         --mint: #34d399; --mint-soft: #5eead4; --red: #f87171; --slate: #94a3b8; --slate2: #cbd5e1; --white: #e6edf6;
       }
       * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, "Segoe UI", Inter, sans-serif; }
-      body { width: 1280px; background: radial-gradient(120% 90% at 50% -10%, rgba(45,212,191,0.10), var(--ink) 55%); color: var(--white); padding: 56px 64px; }
-      .head { margin-bottom: 36px; }
+      body { width: 1280px; background: radial-gradient(120% 90% at 50% -10%, rgba(45,212,191,0.10), var(--ink) 55%); color: var(--white); padding: 40px 64px; }
+      .head { margin-bottom: 22px; }
       .kicker { font-size: 12px; letter-spacing: .24em; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; }
       h1 { font-size: 30px; font-weight: 650; letter-spacing: -0.02em; }
       h1 .grad { background: linear-gradient(90deg, var(--mint-soft), var(--mint)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-      .sub { color: var(--slate); font-size: 15px; margin-top: 8px; }
+      .sub { color: var(--slate); font-size: 15px; margin-top: 8px; line-height: 1.5; }
       .row { display: flex; align-items: stretch; gap: 18px; margin-top: 14px; }
-      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px 20px; flex: 1; box-shadow: 0 24px 60px -36px rgba(0,0,0,.9); }
+      .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 16px 20px; flex: 1; box-shadow: 0 24px 60px -36px rgba(0,0,0,.9); }
       .card.mint { border-color: rgba(52,211,153,.35); box-shadow: 0 0 0 1px rgba(94,234,212,.12), 0 24px 80px -32px rgba(45,212,191,.30); }
       .card.red { border-color: rgba(248,113,113,.35); }
       .tag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); }
       .title { font-size: 18px; font-weight: 600; margin: 6px 0 4px; }
       .desc { font-size: 13px; color: var(--slate); line-height: 1.5; }
       .pill { display: inline-block; font-size: 12px; color: var(--mint-soft); background: rgba(52,211,153,.07); border: 1px solid rgba(52,211,153,.22); border-radius: 999px; padding: 3px 10px; margin-top: 10px; }
+      .pill.red { color: var(--red); background: rgba(248,113,113,.07); border-color: rgba(248,113,113,.28); }
       .arrow { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 150px; color: var(--mint); }
       .arrow .lbl { font-size: 12px; color: var(--slate2); margin-bottom: 6px; text-align: center; line-height: 1.35; }
       .arrow .ln { width: 100%; height: 2px; background: linear-gradient(90deg, rgba(52,211,153,.15), var(--mint)); position: relative; }
       .arrow .ln::after { content: "▶"; position: absolute; right: -2px; top: -8px; font-size: 12px; color: var(--mint); }
-      .down { color: var(--red); font-size: 13px; text-align: center; margin: 16px 0 6px; }
-      .stack { margin-top: 34px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; border-top: 1px solid var(--line); padding-top: 24px; }
+      .down { color: var(--mint); font-size: 18px; text-align: center; margin: 10px 0 4px; }
+      .stack { margin-top: 22px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; justify-content: center; border-top: 1px solid var(--line); padding-top: 20px; }
       .stack .k { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: var(--slate); margin-right: 6px; }
       .chip { font-size: 13px; color: var(--slate2); border: 1px solid var(--line); border-radius: 999px; padding: 5px 13px; }
       .chip b { color: var(--white); font-weight: 600; }
       .mono { font-family: ui-monospace, SFMono-Regular, monospace; }
+      .panel { flex: 1; border: 1px dashed rgba(52,211,153,.30); border-radius: 16px; padding: 12px 14px; background: rgba(52,211,153,.03); }
+      .panel .ptag { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--slate); margin-bottom: 10px; }
+      .agents { display: flex; flex-direction: column; gap: 8px; }
+      .agent { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 10px 13px; }
+      .agent .nm { font-size: 14px; font-weight: 600; }
+      .agent .nm .mono { color: var(--mint-soft); font-weight: 600; }
+      .agent .dl { font-size: 12px; color: var(--slate); margin-top: 2px; line-height: 1.45; }
+      .verdict { display: flex; gap: 12px; margin-top: 12px; }
+      .verdict .v { flex: 1; border-radius: 12px; padding: 10px 14px; font-size: 13px; line-height: 1.4; }
+      .verdict .v.pay { border: 1px solid rgba(52,211,153,.35); background: rgba(52,211,153,.06); color: var(--mint-soft); }
+      .verdict .v.rev { border: 1px solid rgba(248,113,113,.35); background: rgba(248,113,113,.06); color: var(--red); }
+      .verdict .v b { font-weight: 700; }
+      .poison { color: var(--red); font-size: 13px; text-align: center; margin-top: 12px; }
     </style>
   </head>
   <body>
     <div class="head">
       <div class="kicker">Casproof · architecture</div>
-      <h1>Verifiable proof of AI agent outputs <span class="grad">on Casper</span></h1>
-      <div class="sub">A producer agent attests an AI output on-chain; a consumer agent verifies it before paying. Tamper the feed → the payout blocks.</div>
+      <h1>Multi-model <span class="grad">quorum</span> proof of AI outputs on Casper</h1>
+      <div class="sub">k of n independent model agents must attest the byte-identical hash before the vault pays. Tamper one model → no quorum → the payout reverts in the Casper VM.</div>
     </div>
 
     <div class="row">
-      <div class="card">
-        <div class="tag">Producer agent</div>
-        <div class="title">Prices an RWA</div>
-        <div class="desc">An AI agent (Anthropic) values a tokenized real-world asset and fingerprints the output with BLAKE2b-256.</div>
-        <span class="pill">model · prompt · payload</span>
+      <div class="panel">
+        <div class="ptag">Multi-model producer panel · independent keys</div>
+        <div class="agents">
+          <div class="agent">
+            <div class="nm"><span class="mono">claude-opus-4-8</span></div>
+            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
+          </div>
+          <div class="agent">
+            <div class="nm"><span class="mono">claude-sonnet-4-6</span></div>
+            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
+          </div>
+          <div class="agent">
+            <div class="nm"><span class="mono">claude-haiku-4-5</span></div>
+            <div class="dl">values the RWA note · BLAKE2b-256(canonical JSON) · attests its own key</div>
+          </div>
+        </div>
       </div>
       <div class="arrow">
-        <div class="lbl"><b>attest(</b>hash, model,<br/>prompt<b>)</b><br/><span class="mono" style="color:var(--mint-soft)">real testnet tx</span></div>
+        <div class="lbl"><b>attest(</b>request_id, hash,<br/>model, prompt_hash<b>)</b><br/><span class="mono" style="color:var(--mint-soft)">real testnet tx (×n)</span></div>
         <div class="ln"></div>
       </div>
       <div class="card mint">
         <div class="tag">AttestationRegistry</div>
-        <div class="title">Odra → WASM · testnet</div>
-        <div class="desc">Trusted-signer-gated registry. Stores output_hash → {signer, model, time} and emits OutputAttested.</div>
-        <span class="pill">on-chain trust enforced</span>
+        <div class="title">Odra → WASM · testnet · quorum-native</div>
+        <div class="desc">Tallies DISTINCT trusted signers per (request_id, hash). Quorum only when k of n attest the SAME hash. Emits QuorumReached. One vote per signer.</div>
+        <span class="pill">deterministic — hash equality, not an LLM vote</span>
       </div>
     </div>
+
+    <div class="down">▼</div>
 
     <div class="row">
       <div class="card mint">
         <div class="tag">PayoutVault · Odra → WASM</div>
         <div class="title">On-chain verify-gate</div>
-        <div class="desc">A DeFi consumer contract. <b>release()</b> cross-calls the registry's verify() <b>inside the Casper VM</b> and reverts if unattested — no off-chain agent can skip the check.</div>
-        <span class="pill">VM-enforced trust</span>
+        <div class="desc"><b>release(request_id, hash)</b> cross-calls <b>registry.quorum_of()</b> IN THE VM. Authorizes the payout only if hash == the quorum result; otherwise reverts NoQuorum.</div>
+        <span class="pill">trust enforced on-chain</span>
       </div>
       <div class="arrow">
-        <div class="lbl">verify(hash)<br/><span class="mono" style="color:var(--mint-soft)">on-chain cross-call</span></div>
+        <div class="lbl">release(request_id, hash)<br/><span class="mono" style="color:var(--mint-soft)">on-chain cross-call</span></div>
         <div class="ln" style="background: linear-gradient(90deg, var(--mint), rgba(52,211,153,.15));"></div>
       </div>
       <div class="card">
-        <div class="tag">Interfaces</div>
-        <div class="title">MCP · x402 · dashboard</div>
-        <div class="desc">Agents discover attest/verify over <b>MCP</b>; off-chain reads are metered with <b>x402</b>; humans use the <b>CSPR.click</b> dashboard.</div>
+        <div class="tag">Autonomous DeFi consumer · no human in the trust path</div>
+        <div class="title">Polls quorum, calls release</div>
+        <div class="desc">Genuine quorum → PAYOUT. Poisoned / under-quorum → REVERT.</div>
+        <div class="verdict">
+          <div class="v pay"><b>QUORUM → PAY</b></div>
+          <div class="v rev"><b>tampered → NO QUORUM → REVERT</b></div>
+        </div>
       </div>
     </div>
 
-    <div class="down">▼ genuine feed → release AUTHORIZED &nbsp;·&nbsp; poisoned feed (different hash) → <b>on-chain REVERT, payout refused by the VM</b></div>
+    <div class="poison">Change one byte → different hash → never joins the quorum → release reverts.</div>
 
     <div class="stack">
       <span class="k">Built on the Casper stack</span>
-      <span class="chip"><b>Odra</b> contract</span>
-      <span class="chip"><b>casper-js-sdk</b> agents</span>
-      <span class="chip"><b>x402</b> metered reads</span>
-      <span class="chip"><b>MCP</b> agent discovery</span>
-      <span class="chip"><b>CSPR.click</b> wallet</span>
+      <span class="chip"><b>Odra</b></span>
+      <span class="chip"><b>casper-js-sdk v5</b></span>
+      <span class="chip"><b>x402</b> · verify-before-pay</span>
+      <span class="chip"><b>MCP</b> · casproof_verify_output</span>
+      <span class="chip"><b>CSPR.click</b></span>
     </div>
   </body>
 </html>

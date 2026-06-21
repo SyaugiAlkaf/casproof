@@ -1,65 +1,63 @@
 import "dotenv/config";
-import { produceFeed } from "./producer.js";
-import { outputHash, promptHash } from "./attest.js";
-import { attest, findAttestation, loadKey, explorerTxUrl, releaseVault } from "./casper.js";
-import { verify, releasePayout } from "./consumer.js";
+import { outputHash } from "./attest.js";
+import { loadKey, readQuorum, readAgreement, explorerTxUrl, requestId } from "./casper.js";
+import { produceFeed, runQuorum, modelAgents, RWA_PROMPT, RWA_INPUTS } from "./producer.js";
+import { autonomousRelease } from "./consumer.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function waitForIndex(hash: string, tries = 12) {
-  for (let i = 0; i < tries; i++) {
-    if (await findAttestation(hash)) return true;
-    await sleep(3000);
-  }
-  return false;
-}
-
 async function main() {
-  console.log("── Casproof demo ─────────────────────────────────────────");
-  console.log("1. producer agent generates an RWA valuation");
-  const feed = await produceFeed();
-  const oh = outputHash(feed);
-  console.log("   payload:", JSON.stringify(feed.payload));
-  console.log("   hash   :", oh);
+  const agents = modelAgents();
+  const reqId = process.env.REQUEST_ID ?? requestId(RWA_PROMPT, Date.now().toString(36));
 
-  console.log("\n2. producer attests it on-chain");
-  const key = loadKey(process.env.PRODUCER_KEY_PATH ?? "./keys/producer_secret_key.pem");
-  const r = await attest(key, oh, feed.modelId, promptHash(feed.prompt));
-  console.log("   tx     :", r.txHash);
-  console.log("   cost   :", r.cost, "motes");
-  console.log("   explorer:", r.explorer);
-  process.stdout.write("   waiting for the attestation to be visible on-chain ");
-  const indexed = await waitForIndex(oh);
-  console.log(indexed ? "✓" : "(timeout — continuing)");
+  console.log("── Casproof: multi-model quorum integrity demo ───────────────");
+  console.log(`request ${reqId} — valuing ${RWA_INPUTS.asset} with ${agents.length} independent model agents\n`);
 
-  console.log("\n3. consumer (DeFi payout agent) verifies the genuine feed");
-  const good = await verify(feed);
-  console.log("  ", good.ok ? `PASS → ${releasePayout(feed)}` : `BLOCK → ${good.reason}`);
+  console.log(`1. ${agents.length} model agents independently value the note and attest on-chain`);
+  const attestations = await runQuorum(reqId, agents);
+  const hashes = new Set(attestations.map((a) => a.outputHash));
+  const genuineHash = attestations[0].outputHash;
+  console.log(
+    hashes.size === 1
+      ? `   → all ${agents.length} agents agreed on ${genuineHash.slice(0, 24)}…`
+      : `   → agents diverged into ${hashes.size} hashes (no quorum will form)`
+  );
 
-  console.log("\n4. attacker poisons the feed (same source, swapped valuation)");
-  const poisoned = { ...feed, payload: { ...(feed.payload as object), fairValueUsd: 999999 } };
-  console.log("   poisoned hash:", outputHash(poisoned));
-  const bad = await verify(poisoned);
-  console.log("  ", bad.ok ? `PASS → ${releasePayout(poisoned)}` : `BLOCK → ${bad.reason}`);
-
-  if (process.env.VAULT_CONTRACT_HASH) {
-    console.log("\n5. on-chain verify-gate: a DeFi vault releases only if the registry confirms it");
-    const beneficiary = key.publicKey.accountHash().toPrefixedString();
-    const authorized = await releaseVault(key, oh, beneficiary);
-    console.log("   genuine  →", authorized.authorized ? "PAYOUT AUTHORIZED" : `unexpected revert: ${authorized.reason}`);
-    console.log("   tx       :", authorized.explorer);
-    const blocked = await releaseVault(key, outputHash(poisoned), beneficiary);
-    console.log("   poisoned →", blocked.authorized ? "UNEXPECTED PAYOUT" : "REVERTED on-chain (NotAttested)");
-    console.log("   tx       :", blocked.explorer);
-    console.log("   the Casper VM refused the payout — no off-chain agent could override it.");
+  console.log("\n2. the registry tallies distinct signers and forms quorum in the VM");
+  let quorum: string | null = null;
+  for (let i = 0; i < 8 && !quorum; i++) {
+    quorum = await readQuorum(reqId);
+    if (!quorum) await sleep(3000);
   }
+  const agreed = await readAgreement(reqId, genuineHash).catch(() => 0);
+  console.log(
+    quorum
+      ? `   → QUORUM REACHED (${agreed}/${agents.length} agree) on ${quorum.slice(0, 24)}…`
+      : "   → quorum not yet visible via state read (the vault still enforces it in-VM)"
+  );
+
+  const consumerKey = loadKey(process.env.CONSUMER_KEY_PATH ?? "./keys/consumer_secret_key.pem");
+  const beneficiary = consumerKey.publicKey.accountHash().toPrefixedString();
+  const genuineFeed = await produceFeed(agents[0].modelId);
+
+  console.log("\n3. autonomous consumer releases the payout against the genuine output");
+  const paid = await autonomousRelease(reqId, genuineFeed, beneficiary, { tries: 4 });
+  console.log(`   → ${paid.decision}: ${paid.reason}`);
+  if (paid.explorer) console.log(`   tx: ${paid.explorer}`);
+
+  console.log("\n4. an attacker poisons the feed (one byte changed) and retries the payout");
+  const poisonedFeed = await produceFeed(agents[0].modelId, { tamper: true });
+  console.log(`   poisoned hash ${outputHash(poisonedFeed).slice(0, 24)}… ≠ quorum hash`);
+  const blocked = await autonomousRelease(reqId, poisonedFeed, beneficiary, { tries: 1 });
+  console.log(`   → ${blocked.decision}: ${blocked.reason}`);
+  if (blocked.explorer) console.log(`   tx: ${blocked.explorer}`);
 
   console.log("\n──────────────────────────────────────────────────────────");
-  if (good.ok && !bad.ok) {
-    console.log("DEMO OK: genuine feed paid out, poisoned feed refused.");
-    console.log("verify the on-chain attestation:", explorerTxUrl(r.txHash));
+  if (paid.decision === "PAY" && blocked.decision === "BLOCK") {
+    console.log("DEMO OK: quorum-attested output paid out; poisoned output reverted on-chain.");
+    console.log("attestation tx:", explorerTxUrl(attestations[0].txHash));
   } else {
-    console.log("DEMO FAILED:", !good.ok ? "genuine feed was blocked" : "poisoned feed was accepted");
+    console.log(`DEMO FAILED: genuine=${paid.decision}, poisoned=${blocked.decision}`);
     process.exitCode = 1;
   }
 }

@@ -23,6 +23,7 @@ const CONTRACT_HASH = (process.env.REGISTRY_CONTRACT_HASH ?? "").replace(/^(hash
 const CSPR_CLOUD = process.env.CSPR_CLOUD_BASE ?? "https://api.testnet.cspr.cloud";
 const CSPR_CLOUD_KEY = process.env.CSPR_CLOUD_API_KEY ?? "";
 const ATTEST_PAYMENT = Number(process.env.ATTEST_PAYMENT_MOTES ?? 3_000_000_000);
+const ADMIN_PAYMENT = Number(process.env.ADMIN_PAYMENT_MOTES ?? 2_000_000_000);
 const VAULT_HASH = (process.env.VAULT_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
 const VAULT_PAYMENT = Number(process.env.VAULT_PAYMENT_MOTES ?? 5_000_000_000);
 const EXPLORER = process.env.EXPLORER_BASE ?? "https://testnet.cspr.live";
@@ -31,10 +32,13 @@ const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
   .map((s) => s.trim().toLowerCase())
   .filter(Boolean);
 
-// Field index of the `attestations` Mapping inside AttestationRegistry.
-// Declaration order: owner(0), attestations(1), trusted(2). Odra keys each module
-// field by its position, so this must track the struct in contract/src/lib.rs.
-const ATTESTATIONS_FIELD_INDEX = 1;
+// Field indices track the storage-field declaration order in AttestationRegistry
+// (contract/src/lib.rs). Odra keys each module field by its position, so these MUST
+// stay in lockstep with the struct: owner(0), quorum_threshold(1), trusted(2),
+// attestation_count(3), attestations(4), agreement(5), quorum_output(6), voted(7).
+const ATTESTATIONS_FIELD_INDEX = 4;
+const AGREEMENT_FIELD_INDEX = 5;
+const QUORUM_OUTPUT_FIELD_INDEX = 6;
 const STATE_DICTIONARY = "state";
 
 export const rpc = new RpcClient(new HttpHandler(NODE_URL));
@@ -48,6 +52,14 @@ export function loadKey(pemPath: string): PrivateKey {
   return PrivateKey.fromPem(readFileSync(pemPath, "utf8"), algo);
 }
 
+// Deterministic request id for a prompt. The same prompt always maps to the same
+// request so independent producer agents vote on one shared request_id; a suffix
+// keeps separate demo runs from colliding on-chain.
+export function requestId(prompt: string, suffix = ""): string {
+  const base = blakejs.blake2bHex(prompt, undefined, 8);
+  return suffix ? `${base}-${suffix}` : base;
+}
+
 export interface AttestResult {
   txHash: string;
   cost: number;
@@ -56,6 +68,7 @@ export interface AttestResult {
 
 export async function attest(
   key: PrivateKey,
+  reqId: string,
   outputHash: string,
   modelId: string,
   promptHashHex: string
@@ -66,6 +79,7 @@ export async function attest(
     .entryPoint("attest")
     .runtimeArgs(
       Args.fromMap({
+        request_id: CLValue.newCLString(reqId),
         output_hash: CLValue.newCLString(outputHash),
         model_id: CLValue.newCLString(modelId),
         prompt_hash: CLValue.newCLString(promptHashHex),
@@ -87,6 +101,43 @@ export async function attest(
   return { txHash, cost: Number(result?.consumed ?? 0), explorer: explorerTxUrl(txHash) };
 }
 
+export interface AdminResult {
+  txHash: string;
+  explorer: string;
+}
+
+// Owner-only: onboard a trusted signer-agent (its account hash) into the quorum set.
+export async function setTrusted(key: PrivateKey, signerAccountHash: string, trusted: boolean): Promise<AdminResult> {
+  return ownerCall(key, "set_trusted", {
+    signer: CLValue.newCLKey(Key.newKey(signerAccountHash)),
+    trusted: CLValue.newCLValueBool(trusted),
+  });
+}
+
+// Owner-only: set the k-of-n quorum threshold.
+export async function setQuorum(key: PrivateKey, threshold: number): Promise<AdminResult> {
+  return ownerCall(key, "set_quorum", { threshold: CLValue.newCLUInt32(threshold) });
+}
+
+async function ownerCall(key: PrivateKey, entryPoint: string, args: Record<string, unknown>): Promise<AdminResult> {
+  requireContract();
+  const tx = new ContractCallBuilder()
+    .byHash(CONTRACT_HASH)
+    .entryPoint(entryPoint)
+    .runtimeArgs(Args.fromMap(args as never))
+    .from(key.publicKey)
+    .chainName(NETWORK)
+    .payment(ADMIN_PAYMENT)
+    .build();
+  tx.sign(key);
+  const res = await rpc.putTransaction(tx);
+  const txHash = hashHex(res.transactionHash);
+  const info = await rpc.waitForTransaction(tx, 180_000);
+  const error = info.executionInfo?.executionResult?.errorMessage;
+  if (error) throw new Error(`${entryPoint} reverted on-chain: ${error} (tx ${txHash})`);
+  return { txHash, explorer: explorerTxUrl(txHash) };
+}
+
 export interface VaultReleaseResult {
   txHash: string;
   authorized: boolean;
@@ -94,11 +145,12 @@ export interface VaultReleaseResult {
   explorer: string;
 }
 
-// Calls PayoutVault.release on-chain. The vault cross-calls the registry's verify()
-// inside the Casper VM: an attested output authorizes the payout; a poisoned/unattested
-// output reverts (NotAttested). Either way this produces a real testnet transaction.
+// Calls PayoutVault.release on-chain. The vault cross-calls the registry's quorum_of()
+// inside the Casper VM: an output that reached k-of-n quorum authorizes the payout; a
+// poisoned/under-quorum output reverts (NoQuorum). Either way this is a real testnet tx.
 export async function releaseVault(
   key: PrivateKey,
+  reqId: string,
   outputHash: string,
   beneficiaryAccountHash: string
 ): Promise<VaultReleaseResult> {
@@ -109,6 +161,7 @@ export async function releaseVault(
     .entryPoint("release")
     .runtimeArgs(
       Args.fromMap({
+        request_id: CLValue.newCLString(reqId),
         output_hash: CLValue.newCLString(outputHash),
         beneficiary: CLValue.newCLKey(Key.newKey(beneficiaryAccountHash)),
       })
@@ -132,9 +185,9 @@ export interface AttestationRecord {
   raw: unknown;
 }
 
-// Looks up whether `outputHash` is attested on the registry. Primary path reads the
-// contract's state dictionary straight from the node (no indexer, no API key); if that
-// can't resolve and a CSPR.cloud key is configured, it falls back to the events index.
+// Looks up whether `outputHash` has a base attestation on the registry. Primary path
+// reads the contract's state dictionary straight from the node (no indexer, no API key);
+// if that can't resolve and a CSPR.cloud key is configured, it falls back to events.
 export async function findAttestation(outputHash: string): Promise<AttestationRecord | null> {
   requireContract();
   try {
@@ -146,22 +199,43 @@ export async function findAttestation(outputHash: string): Promise<AttestationRe
   }
 }
 
-async function readAttestationOnChain(outputHash: string): Promise<AttestationRecord | null> {
+// The quorum-attested output hash for a request, or null if no output has reached the
+// threshold yet. Reads the quorum_output dictionary directly from the node.
+export async function readQuorum(reqId: string): Promise<string | null> {
+  requireContract();
+  const stored = await readStateItem(QUORUM_OUTPUT_FIELD_INDEX, reqId);
+  if (stored === null) return null;
+  return parseHashValue(stored);
+}
+
+// How many distinct trusted signers have attested this exact output for this request.
+export async function readAgreement(reqId: string, outputHash: string): Promise<number> {
+  requireContract();
+  const stored = await readStateItem(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
+  if (stored === null) return 0;
+  return parseNumberValue(stored);
+}
+
+async function readStateItem(fieldIndex: number, key: string): Promise<unknown | null> {
   const seedUref = await resolveStateUref();
-  const itemKey = stateItemKey(ATTESTATIONS_FIELD_INDEX, outputHash);
+  const itemKey = stateItemKey(fieldIndex, key);
   const identifier = new ParamDictionaryIdentifier(
     undefined,
     undefined,
     new ParamDictionaryIdentifierURef(itemKey, seedUref)
   );
-  let stored;
   try {
-    stored = await rpc.getDictionaryItemByIdentifier(null, identifier);
+    return await rpc.getDictionaryItemByIdentifier(null, identifier);
   } catch (e) {
     if (isNotFound(e)) return null;
     throw e;
   }
-  return { signer: extractSigner(stored), source: "chain", raw: stored.rawJSON ?? stored };
+}
+
+async function readAttestationOnChain(outputHash: string): Promise<AttestationRecord | null> {
+  const stored = await readStateItem(ATTESTATIONS_FIELD_INDEX, outputHash);
+  if (stored === null) return null;
+  return { signer: extractSigner(stored), source: "chain", raw: (stored as { rawJSON?: unknown }).rawJSON ?? stored };
 }
 
 let cachedUref: string | undefined;
@@ -236,6 +310,21 @@ function urefOf(res: unknown): string | undefined {
 function extractSigner(stored: unknown): string {
   const m = JSON.stringify(stored).match(/(account-hash-[0-9a-f]{64}|0[12][0-9a-f]{64})/i);
   return m?.[0] ?? "";
+}
+
+// The registry stores a CLString output hash; CLValue JSON carries it under "parsed".
+function parseHashValue(stored: unknown): string | null {
+  const s = JSON.stringify(stored);
+  const parsed = s.match(/"parsed"\s*:\s*"([0-9a-fA-F]{64})"/);
+  if (parsed) return parsed[1].toLowerCase();
+  const any = s.match(/[0-9a-f]{64}/i);
+  return any ? any[0].toLowerCase() : null;
+}
+
+function parseNumberValue(stored: unknown): number {
+  const s = JSON.stringify(stored);
+  const parsed = s.match(/"parsed"\s*:\s*(\d+)/);
+  return parsed ? Number(parsed[1]) : 0;
 }
 
 function hashHex(h: { transactionV1?: { toHex(): string }; deploy?: { toHex(): string } }): string {

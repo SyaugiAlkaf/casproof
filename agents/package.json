@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "keygen": "tsx src/keygen.ts",
+    "keygen:quorum": "tsx src/keygenQuorum.ts",
     "deploy": "tsx src/deploy.ts",
     "deploy:vault": "tsx src/deployVault.ts",
     "resolve": "tsx src/resolve.ts",
     "resolve:vault": "tsx src/resolve.ts vault",
+    "setup": "tsx src/setup.ts",
     "producer": "tsx src/producer.ts",
     "consumer": "tsx src/consumer.ts",
     "demo": "tsx src/demo.ts",

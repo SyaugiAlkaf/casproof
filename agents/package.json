@@ -6,6 +6,7 @@
   "scripts": {
     "keygen": "tsx src/keygen.ts",
     "keygen:quorum": "tsx src/keygenQuorum.ts",
+    "fund": "tsx src/fund.ts",
     "deploy": "tsx src/deploy.ts",
     "deploy:vault": "tsx src/deployVault.ts",
     "resolve": "tsx src/resolve.ts",

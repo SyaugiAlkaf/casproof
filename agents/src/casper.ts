@@ -119,6 +119,11 @@ export async function setQuorum(key: PrivateKey, threshold: number): Promise<Adm
   return ownerCall(key, "set_quorum", { threshold: CLValue.newCLUInt32(threshold) });
 }
 
+// Owner-only: slash a signer caught diverging/colluding — revokes trust and lowers standing.
+export async function slashSigner(key: PrivateKey, signerAccountHash: string): Promise<AdminResult> {
+  return ownerCall(key, "slash", { signer: CLValue.newCLKey(Key.newKey(signerAccountHash)) });
+}
+
 async function ownerCall(key: PrivateKey, entryPoint: string, args: Record<string, unknown>): Promise<AdminResult> {
   requireContract();
   const tx = new ContractCallBuilder()

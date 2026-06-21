@@ -12,6 +12,7 @@
     "resolve": "tsx src/resolve.ts",
     "resolve:vault": "tsx src/resolve.ts vault",
     "setup": "tsx src/setup.ts",
+    "slash": "tsx src/slash.ts",
     "producer": "tsx src/producer.ts",
     "consumer": "tsx src/consumer.ts",
     "demo": "tsx src/demo.ts",

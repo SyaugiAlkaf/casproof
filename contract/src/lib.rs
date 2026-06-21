@@ -37,6 +37,14 @@ pub struct QuorumReached {
     pub agreed: u32,
 }
 
+/// Emitted when the owner slashes a signer found to have diverged or colluded.
+/// Slashing revokes trust and reduces the signer's standing — the skin-in-the-game
+/// that keeps the trusted set honest until staking lands on the roadmap.
+#[odra::event]
+pub struct SignerSlashed {
+    pub signer: Address,
+}
+
 #[odra::odra_error]
 pub enum Error {
     NotOwner = 1,
@@ -57,9 +65,10 @@ pub enum Error {
 ///
 /// The check is deterministic — pure hash equality, never an opinion poll — so a
 /// single swapped or tampered model produces a different hash, fails to add to the
-/// agreeing set, and cannot reach quorum. This is the trustless integrity layer
-/// that subjective accuracy/reputation oracles sit on top of.
-#[odra::module(events = [OutputAttested, QuorumReached])]
+/// agreeing set, and cannot reach quorum. Quorum is one pluggable attestation policy
+/// behind the unskippable on-chain verify-before-act gate (`require_quorum` /
+/// PayoutVault); proof-of-computation receipts (TEE/zk) are the roadmap source.
+#[odra::module(events = [OutputAttested, QuorumReached, SignerSlashed])]
 pub struct AttestationRegistry {
     owner: Var<Address>,
     quorum_threshold: Var<u32>,
@@ -72,6 +81,8 @@ pub struct AttestationRegistry {
     quorum_output: Mapping<String, String>,
     // one-vote-per-signer-per-request guard, keyed by (request_id, signer).
     voted: Mapping<(String, Address), bool>,
+    // slash count per signer; subtracted from standing so lying cannot pay off.
+    slashes: Mapping<Address, u64>,
 }
 
 #[odra::module]
@@ -159,6 +170,20 @@ impl AttestationRegistry {
         self.quorum_output.get(&request_id)
     }
 
+    /// The composable verify-before-act guard: returns the lead signer if `output_hash`
+    /// is the quorum-attested result for `request_id`, otherwise reverts. Any contract can
+    /// cross-call this so the verify decision and its own action execute in one atomic VM
+    /// call — the gate cannot be skipped off-chain.
+    pub fn require_quorum(&self, request_id: String, output_hash: String) -> Address {
+        match self.quorum_output.get(&request_id) {
+            Some(winner) if winner == output_hash => match self.attestations.get(&output_hash) {
+                Some(record) => record.signer,
+                None => self.env().revert(Error::NotAttested),
+            },
+            _ => self.env().revert(Error::NoQuorum),
+        }
+    }
+
     /// How many distinct trusted signers have attested this exact output for this
     /// request (the live "k of n agree" figure).
     pub fn agreement_count(&self, request_id: String, output_hash: String) -> u32 {
@@ -173,14 +198,28 @@ impl AttestationRegistry {
         self.trusted.get(&signer).unwrap_or(false)
     }
 
-    /// Portable agent reputation: how many outputs this signer has attested.
+    /// Portable agent reputation: outputs attested, net of slashes. Slashing makes the
+    /// score fall, so a signer that lies cannot accumulate standing by attesting more.
     pub fn reputation(&self, signer: Address) -> u64 {
-        self.attestation_count.get(&signer).unwrap_or(0)
+        self.attestation_count
+            .get(&signer)
+            .unwrap_or(0)
+            .saturating_sub(self.slashes.get(&signer).unwrap_or(0))
     }
 
     pub fn set_trusted(&mut self, signer: Address, trusted: bool) {
         self.assert_owner();
         self.trusted.set(&signer, trusted);
+    }
+
+    /// Owner-only: penalise a signer caught diverging or colluding. Revokes trust and
+    /// lowers its standing — the enforcement hook the trusted set answers to today, and
+    /// the slot a bonded stake plugs into on the roadmap.
+    pub fn slash(&mut self, signer: Address) {
+        self.assert_owner();
+        self.slashes.add(&signer, 1);
+        self.trusted.set(&signer, false);
+        self.env().emit_event(SignerSlashed { signer });
     }
 
     pub fn set_quorum(&mut self, threshold: u32) {
@@ -208,11 +247,14 @@ fn agreement_key(request_id: &str, output_hash: &str) -> String {
     key
 }
 
-/// The registry as seen from another contract: PayoutVault calls these in-VM.
+/// The registry as seen from another contract: a consumer cross-calls these in-VM.
+/// `require_quorum` is the guard most contracts use — it reverts unless the output is
+/// quorum-attested, so verify-and-act happen atomically and cannot be skipped off-chain.
 #[odra::external_contract]
 pub trait Registry {
     fn verify(&self, output_hash: String) -> Option<Attestation>;
     fn quorum_of(&self, request_id: String) -> Option<String>;
+    fn require_quorum(&self, request_id: String, output_hash: String) -> Address;
     fn reputation(&self, signer: Address) -> u64;
 }
 
@@ -225,10 +267,10 @@ pub struct PayoutAuthorized {
     pub reputation: u64,
 }
 
-/// A DeFi consumer contract. It releases a payout only if the presented output is
-/// the quorum-attested result for the request — the verify-before-act decision runs
-/// inside the Casper VM, so no off-chain agent can skip it. A poisoned feed (a hash
-/// that did not reach quorum) reverts.
+/// A DeFi consumer behind the action firewall: an example of any contract composing
+/// the registry's `require_quorum` guard. Verify-before-act runs inside the Casper VM in
+/// one atomic call, so no off-chain agent can skip the check; a poisoned/under-quorum
+/// output reverts before a single mote moves.
 #[odra::module(events = [PayoutAuthorized])]
 pub struct PayoutVault {
     registry: External<RegistryContractRef>,
@@ -240,28 +282,20 @@ impl PayoutVault {
         self.registry.set(registry);
     }
 
-    /// Authorizes a payout for `request_id` against `output_hash`. Succeeds only if
-    /// the registry reports `output_hash` as the quorum-attested result for that
-    /// request; otherwise reverts (`NoQuorum`). Returns the lead signer's reputation.
+    /// Authorizes a payout for `request_id` against `output_hash`. The `require_quorum`
+    /// guard reverts in-VM unless `output_hash` is the quorum-attested result, so this
+    /// returns (with the lead signer's reputation) only on a verified output.
     pub fn release(&mut self, request_id: String, output_hash: String, beneficiary: Address) -> u64 {
-        match self.registry.quorum_of(request_id.clone()) {
-            Some(winner) if winner == output_hash => {
-                let signer = match self.registry.verify(output_hash.clone()) {
-                    Some(record) => record.signer,
-                    None => self.env().revert(Error::NotAttested),
-                };
-                let reputation = self.registry.reputation(signer);
-                self.env().emit_event(PayoutAuthorized {
-                    request_id,
-                    output_hash,
-                    beneficiary,
-                    signer,
-                    reputation,
-                });
-                reputation
-            }
-            _ => self.env().revert(Error::NoQuorum),
-        }
+        let signer = self.registry.require_quorum(request_id.clone(), output_hash.clone());
+        let reputation = self.registry.reputation(signer);
+        self.env().emit_event(PayoutAuthorized {
+            request_id,
+            output_hash,
+            beneficiary,
+            signer,
+            reputation,
+        });
+        reputation
     }
 }
 
@@ -375,6 +409,53 @@ mod tests {
         registry.attest("a".into(), "x".into(), "m".into(), "p".into());
         registry.attest("b".into(), "y".into(), "m".into(), "p".into());
         assert_eq!(registry.reputation(owner), 2);
+    }
+
+    #[test]
+    fn slash_lowers_standing_and_revokes_trust() {
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        env.set_caller(s2);
+        registry.attest("r1".into(), "x".into(), "m".into(), "p".into());
+        registry.attest("r2".into(), "y".into(), "m".into(), "p".into());
+
+        env.set_caller(env.get_account(0));
+        assert_eq!(registry.reputation(s2), 2);
+        registry.slash(s2);
+        assert_eq!(registry.reputation(s2), 1);
+        assert!(!registry.is_trusted(s2));
+
+        env.set_caller(s2);
+        assert_eq!(
+            registry.try_attest("r3".into(), "z".into(), "m".into(), "p".into()),
+            Err(Error::NotTrusted.into())
+        );
+    }
+
+    #[test]
+    fn non_owner_cannot_slash() {
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        env.set_caller(env.get_account(1));
+        assert_eq!(registry.try_slash(env.get_account(1)), Err(Error::NotOwner.into()));
+    }
+
+    #[test]
+    fn require_quorum_returns_signer_when_met_else_reverts() {
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        assert_eq!(
+            registry.try_require_quorum("r".into(), "h".into()),
+            Err(Error::NoQuorum.into())
+        );
+        registry.attest("r".into(), "h".into(), "m".into(), "p".into());
+        assert_eq!(registry.require_quorum("r".into(), "h".into()), env.get_account(0));
+        assert_eq!(
+            registry.try_require_quorum("r".into(), "poisoned".into()),
+            Err(Error::NoQuorum.into())
+        );
     }
 
     #[test]

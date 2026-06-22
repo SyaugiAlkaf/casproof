@@ -22,6 +22,7 @@ customers/
 .env
 .env.*
 !.env.example
+casproof.models.json
 *.pem
 *.key
 *.p12

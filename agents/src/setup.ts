@@ -1,14 +1,14 @@
 import "dotenv/config";
 import { existsSync } from "node:fs";
 import { loadKey, setQuorum, setTrusted } from "./casper.js";
-import { modelAgents } from "./producer.js";
+import { modelAgents, quorumThreshold } from "./producer.js";
 
 // One-time, owner-only: set the k-of-n threshold and onboard every model agent's key as a
 // trusted signer. Run after deploy + resolve, once REGISTRY_CONTRACT_HASH is set in .env.
 async function main() {
   const ownerKey = loadKey(process.env.PRODUCER_KEY_PATH ?? "./keys/producer_secret_key.pem");
-  const threshold = Number(process.env.QUORUM_THRESHOLD ?? 3);
   const agents = modelAgents();
+  const threshold = quorumThreshold(agents);
 
   console.log(`setting quorum threshold to ${threshold} (of ${agents.length} model agents) ...`);
   const q = await setQuorum(ownerKey, threshold);

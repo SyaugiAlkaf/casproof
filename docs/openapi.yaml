@@ -1,0 +1,198 @@
+openapi: 3.1.0
+info:
+  title: Casproof Verify API
+  version: 0.2.0
+  description: >
+    On-chain attestation verify gate for AI agent outputs. Submit an output hash (or
+    the full feed to fingerprint on the server) and receive a PROCEED / BLOCK decision
+    backed by the Casper registry contract.
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:4021
+    description: Local verify server (x402 sim mode)
+
+paths:
+  /verify:
+    get:
+      operationId: verifyOutput
+      summary: Verify an AI output hash against the on-chain registry
+      description: >
+        Returns attestation proof and a quorum summary for the given output hash.
+        Requires an x-payment header (sim mode accepts any non-empty value; live mode
+        requires a valid x402 CSPR payment authorization).
+      parameters:
+        - name: hash
+          in: query
+          required: true
+          description: 64-character lowercase hex BLAKE2b-256 output hash
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+            example: "a3f4e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3"
+        - name: requestId
+          in: query
+          required: false
+          description: Quorum request ID; enables k-of-n quorum lookup
+          schema:
+            type: string
+            example: "rwa-001"
+      security:
+        - x402Payment: []
+      responses:
+        "200":
+          description: Attestation record and quorum proof
+          headers:
+            x-payment-response:
+              description: x402 settlement confirmation header
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResponse"
+              examples:
+                attested_quorum_reached:
+                  summary: Attested output with quorum
+                  value:
+                    hash: "a3f4e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3"
+                    attested: true
+                    signer: "020202aa1122334455667788990011223344556677889900112233445566778899aabb"
+                    trusted: true
+                    source: "claude-opus-4-8"
+                    quorum:
+                      quorumReached: true
+                      winningHash: "a3f4e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3"
+                      agreement: 2
+                unattested:
+                  summary: Hash not on-chain
+                  value:
+                    hash: "a3f4e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3"
+                    attested: false
+        "400":
+          description: Invalid hash parameter
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "402":
+          description: Payment required (x402 challenge) or payment invalid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/X402Challenge"
+        "500":
+          description: Registry read failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: x402 settlement error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+components:
+  securitySchemes:
+    x402Payment:
+      type: apiKey
+      in: header
+      name: x-payment
+      description: >
+        x402 machine payment header. In sim mode (default) any non-empty string is
+        accepted. In live mode this must be a valid x402 CSPR payment authorization
+        issued by the payer's x402 client against the requirements returned in the 402
+        challenge.
+
+  schemas:
+    QuorumResult:
+      type: object
+      description: k-of-n quorum proof; present only when requestId was supplied
+      properties:
+        quorumReached:
+          type: boolean
+          description: True when at least threshold signers attested the same winning hash
+        winningHash:
+          type: ["string", "null"]
+          description: The hash that reached quorum, or null if quorum is not yet met
+        agreement:
+          type: integer
+          description: Number of signers who attested the winning hash
+      required:
+        - quorumReached
+        - agreement
+
+    VerifyResponse:
+      type: object
+      properties:
+        hash:
+          type: string
+          description: The queried output hash (64 hex chars)
+        attested:
+          type: boolean
+          description: True when this exact hash exists in the registry
+        signer:
+          type: ["string", "null"]
+          description: Hex-encoded public key of the attesting signer (when attested)
+        trusted:
+          type: ["boolean", "null"]
+          description: True when the signer is on the trusted list (when attested)
+        source:
+          type: ["string", "null"]
+          description: Model ID recorded by the attesting producer (when attested)
+        quorum:
+          $ref: "#/components/schemas/QuorumResult"
+      required:
+        - hash
+        - attested
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+        reason:
+          type: string
+      required:
+        - error
+
+    X402Challenge:
+      type: object
+      description: Payment requirements returned on a 402
+      properties:
+        scheme:
+          type: string
+          example: "exact"
+        network:
+          type: string
+          example: "casper:casper-test"
+        maxAmountRequired:
+          type: string
+          description: Amount in motes
+          example: "100000000"
+        resource:
+          type: string
+        description:
+          type: string
+        mimeType:
+          type: string
+        payTo:
+          type: string
+          description: Recipient CSPR account hash
+        maxTimeoutSeconds:
+          type: integer
+        asset:
+          type: string
+          example: "CSPR"
+        accepts:
+          type: array
+          items:
+            type: object
+      required:
+        - scheme
+        - network
+        - maxAmountRequired
+        - resource

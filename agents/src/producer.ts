@@ -1,7 +1,8 @@
 import "dotenv/config";
-import Anthropic from "@anthropic-ai/sdk";
+import { readFileSync, existsSync } from "node:fs";
 import { AgentOutput, outputHash, promptHash } from "./attest.js";
 import { attest, loadKey, requestId } from "./casper.js";
+import { generate, ProviderKind } from "./providers.js";
 
 // The published inputs for the request. Every producer agent values the same note
 // from the same inputs, so honest agents must arrive at the byte-identical result.
@@ -46,45 +47,81 @@ export function normalizeToSpec(raw: Record<string, unknown>, inputs: RwaInputs)
 export interface ModelAgent {
   modelId: string;
   keyPath: string;
+  provider: ProviderKind;
+  baseUrl?: string;
+  apiKeyEnv?: string;
+  temperature?: number;
 }
 
-// One agent per model/operator, each with its own signing key. Override with
-// QUORUM_MODELS="modelId:keyPath,modelId:keyPath" to run a different panel.
+interface ModelsConfig {
+  threshold?: number;
+  agents: Array<Partial<ModelAgent> & { modelId: string; keyPath: string }>;
+}
+
+const DEFAULT_AGENTS: ModelAgent[] = [
+  { modelId: "claude-opus-4-8", keyPath: "./keys/producer_secret_key.pem", provider: "anthropic" },
+  { modelId: "claude-sonnet-4-6", keyPath: "./keys/producer2_secret_key.pem", provider: "anthropic" },
+  { modelId: "claude-haiku-4-5-20251001", keyPath: "./keys/producer3_secret_key.pem", provider: "anthropic" },
+];
+
+function configPath(): string | null {
+  const explicit = process.env.CASPROOF_MODELS;
+  if (explicit) return existsSync(explicit) ? explicit : null;
+  return existsSync("./casproof.models.json") ? "./casproof.models.json" : null;
+}
+
+export function loadModelsConfig(): ModelsConfig | null {
+  const path = configPath();
+  if (!path) return null;
+  const parsed = JSON.parse(readFileSync(path, "utf8")) as ModelsConfig;
+  if (!Array.isArray(parsed.agents) || parsed.agents.length === 0) {
+    throw new Error(`${path}: "agents" must be a non-empty array`);
+  }
+  return parsed;
+}
+
+// Resolution order: (a) JSON config at $CASPROOF_MODELS or ./casproof.models.json,
+// (b) env QUORUM_MODELS="modelId:keyPath,...", (c) the 3 built-in Anthropic defaults.
 export function modelAgents(): ModelAgent[] {
+  const config = loadModelsConfig();
+  if (config) {
+    return config.agents.map((a) => ({
+      modelId: a.modelId.trim(),
+      keyPath: a.keyPath.trim(),
+      provider: a.provider ?? "anthropic",
+      baseUrl: a.baseUrl,
+      apiKeyEnv: a.apiKeyEnv,
+      temperature: a.temperature,
+    }));
+  }
   const env = process.env.QUORUM_MODELS;
   if (env) {
     return env.split(",").map((entry) => {
       const [modelId, keyPath] = entry.split(":");
-      return { modelId: modelId.trim(), keyPath: (keyPath ?? "").trim() };
+      return { modelId: modelId.trim(), keyPath: (keyPath ?? "").trim(), provider: "anthropic" as ProviderKind };
     });
   }
-  return [
-    { modelId: "claude-opus-4-8", keyPath: "./keys/producer_secret_key.pem" },
-    { modelId: "claude-sonnet-4-6", keyPath: "./keys/producer2_secret_key.pem" },
-    { modelId: "claude-haiku-4-5-20251001", keyPath: "./keys/producer3_secret_key.pem" },
-  ];
+  return DEFAULT_AGENTS;
 }
 
-// Runs one model agent over the request. With ANTHROPIC_API_KEY set it genuinely calls
-// the model; offline it falls back to the deterministic valuation so the whole flow runs
-// for free. `tamper` simulates a compromised/substituted agent returning a bad output.
-export async function produceFeed(modelId: string, opts: { tamper?: boolean } = {}): Promise<AgentOutput> {
-  const inputs = opts.tamper ? { ...RWA_INPUTS, dailyGrossUsd: 99_999 } : RWA_INPUTS;
+// Quorum threshold k. Config file wins, then QUORUM_THRESHOLD, else the agent count.
+export function quorumThreshold(agents = modelAgents()): number {
+  const config = loadModelsConfig();
+  if (config?.threshold) return config.threshold;
+  if (process.env.QUORUM_THRESHOLD) return Number(process.env.QUORUM_THRESHOLD);
+  return agents.length;
+}
 
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { modelId, prompt: RWA_PROMPT, payload: valuate(inputs) };
-  }
-  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  const res = await anthropic.messages.create({
-    model: modelId,
-    max_tokens: 256,
-    temperature: 0,
-    messages: [{ role: "user", content: RWA_PROMPT + (opts.tamper ? " (use daily gross $99,999)" : "") }],
-  });
-  const text = res.content.find((b) => b.type === "text") as { text: string } | undefined;
-  const match = (text?.text ?? "").match(/\{[\s\S]*\}/);
-  const payload = match ? normalizeToSpec(JSON.parse(match[0]), inputs) : valuate(inputs);
-  return { modelId, prompt: RWA_PROMPT, payload };
+// Runs one model agent over the request through its configured provider, then normalizes the
+// answer onto the published spec so honest agents converge. Any provider failure (or an
+// offline agent) degrades to the deterministic valuation so the whole flow runs for free.
+// `tamper` simulates a compromised/substituted agent returning a bad output.
+export async function produceFeed(agent: ModelAgent, opts: { tamper?: boolean } = {}): Promise<AgentOutput> {
+  const inputs = opts.tamper ? { ...RWA_INPUTS, dailyGrossUsd: 99_999 } : RWA_INPUTS;
+  const prompt = RWA_PROMPT + (opts.tamper ? " (use daily gross $99,999)" : "");
+  const { payload: raw } = await generate(agent, prompt);
+  const payload = raw ? normalizeToSpec(raw, inputs) : valuate(inputs);
+  return { modelId: agent.modelId, prompt: RWA_PROMPT, payload };
 }
 
 export interface ProducerAttestation {
@@ -105,7 +142,7 @@ export async function runQuorum(
   const results: ProducerAttestation[] = [];
   for (let i = 0; i < agents.length; i++) {
     const agent = agents[i];
-    const feed = await produceFeed(agent.modelId, { tamper: tamperLast && i === agents.length - 1 });
+    const feed = await produceFeed(agent, { tamper: tamperLast && i === agents.length - 1 });
     const oh = outputHash(feed);
     const key = loadKey(agent.keyPath);
     const r = await attest(key, reqId, oh, agent.modelId, ph);

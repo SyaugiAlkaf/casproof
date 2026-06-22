@@ -78,8 +78,8 @@ async function main() {
   const reqId = process.env.REQUEST_ID ?? requestId(RWA_PROMPT, "live");
   const key = loadKey(process.env.CONSUMER_KEY_PATH ?? "./keys/consumer_secret_key.pem");
   const beneficiary = key.publicKey.accountHash().toPrefixedString();
-  const { produceFeed } = await import("./producer.js");
-  const feed = await produceFeed("claude-opus-4-8");
+  const { produceFeed, modelAgents } = await import("./producer.js");
+  const feed = await produceFeed(modelAgents()[0]);
   console.log(`consumer watching request ${reqId} (hash ${outputHash(feed).slice(0, 16)}…)`);
   const decision = await autonomousRelease(reqId, feed, beneficiary);
   console.log(`${decision.decision}: ${decision.reason}`);

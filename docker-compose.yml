@@ -1,0 +1,58 @@
+# Casproof — one-command run.
+#
+#   docker compose up                 # verify server only (port 4021)
+#   docker compose --profile ui up    # verify server + dashboard (port 3000)
+#
+# Config comes from a root .env (copy .env.example -> .env). After you deploy
+# the contract, set at least these in that .env, then re-run `docker compose up`:
+#   REGISTRY_CONTRACT_HASH=<bare hex contract hash>
+#   CASPER_CHAIN_RPC=https://node.testnet.casper.network/rpc
+# The .env is git/dockerignored and is mounted via env_file, never baked into
+# an image. Keys in ./agents/keys stay on the host and are never copied in.
+
+services:
+  verify:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+    image: casproof-verify
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      X402_PORT: "4021"
+    ports:
+      - "4021:4021"
+    restart: unless-stopped
+    healthcheck:
+      # /verify with a valid-shaped hash and no payment returns 402 (alive +
+      # expected). node is always present in the image; curl/wget are not.
+      test:
+        - CMD
+        - node
+        - -e
+        - |
+          const h='0'.repeat(64);
+          require('http').get('http://127.0.0.1:'+(process.env.X402_PORT||4021)+'/verify?hash='+h,r=>process.exit([200,402].includes(r.statusCode)?0:1)).on('error',()=>process.exit(1));
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  dashboard:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+    image: casproof-dashboard
+    profiles:
+      - ui
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PORT: "3000"
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - verify

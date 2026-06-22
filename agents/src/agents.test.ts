@@ -1,10 +1,37 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { AddressInfo } from "node:net";
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { canonical, outputHash, promptHash, AgentOutput } from "./attest.js";
 import { stateItemKey, isTrusted, findAttestation, explorerTxUrl, requestId } from "./casper.js";
-import { valuate, normalizeToSpec, RWA_INPUTS } from "./producer.js";
+import { valuate, normalizeToSpec, RWA_INPUTS, modelAgents, quorumThreshold, produceFeed } from "./producer.js";
+import { generate } from "./providers.js";
 import { challenge, encodePayment, decodePayment, paymentRequirements, X402_VERSION } from "./x402.js";
+
+function withModelsConfig(config: unknown, fn: () => Promise<void> | void) {
+  const dir = mkdtempSync(join(tmpdir(), "casproof-models-"));
+  const path = join(dir, "casproof.models.json");
+  writeFileSync(path, JSON.stringify(config));
+  const prevCfg = process.env.CASPROOF_MODELS;
+  const prevModels = process.env.QUORUM_MODELS;
+  const prevThreshold = process.env.QUORUM_THRESHOLD;
+  process.env.CASPROOF_MODELS = path;
+  return (async () => {
+    try {
+      await fn();
+    } finally {
+      if (prevCfg === undefined) delete process.env.CASPROOF_MODELS;
+      else process.env.CASPROOF_MODELS = prevCfg;
+      if (prevModels === undefined) delete process.env.QUORUM_MODELS;
+      else process.env.QUORUM_MODELS = prevModels;
+      if (prevThreshold === undefined) delete process.env.QUORUM_THRESHOLD;
+      else process.env.QUORUM_THRESHOLD = prevThreshold;
+      rmSync(dir, { recursive: true, force: true });
+    }
+  })();
+}
 
 const HASH_VECTOR = "83784d8eadfb07e174eab9591ca4d4cd8a059053a5b564a196b3b2eae6003a08";
 
@@ -47,6 +74,80 @@ test("model answers snap onto the published spec so honest models converge", () 
   const a = normalizeToSpec({ asset: "PARK-NOTE-001", fairValueUsd: 1278123, confidence: 0.7 }, RWA_INPUTS);
   const b = normalizeToSpec({ asset: "PARK-NOTE-001", fairValueUsd: 1277888, confidence: 0.95 }, RWA_INPUTS);
   assert.deepEqual(a, b);
+});
+
+test("a config file selects the panel and its providers", () =>
+  withModelsConfig(
+    {
+      threshold: 2,
+      agents: [
+        { modelId: "llama3.1", provider: "openai", keyPath: "./keys/a.pem", baseUrl: "http://localhost:11434/v1" },
+        { modelId: "claude-opus-4-8", provider: "anthropic", keyPath: "./keys/b.pem" },
+        { modelId: "fallback", provider: "offline", keyPath: "./keys/c.pem" },
+      ],
+    },
+    () => {
+      const agents = modelAgents();
+      assert.deepEqual(agents.map((a) => a.provider), ["openai", "anthropic", "offline"]);
+      assert.equal(agents[0].baseUrl, "http://localhost:11434/v1");
+      assert.equal(quorumThreshold(agents), 2);
+    }
+  ));
+
+test("a config file overrides QUORUM_MODELS (file wins over env)", () =>
+  withModelsConfig(
+    { agents: [{ modelId: "from-file", provider: "offline", keyPath: "./keys/f.pem" }] },
+    () => {
+      process.env.QUORUM_MODELS = "from-env:./keys/e.pem";
+      const agents = modelAgents();
+      assert.equal(agents.length, 1);
+      assert.equal(agents[0].modelId, "from-file");
+    }
+  ));
+
+test("QUORUM_MODELS is honored when no config file is present and defaults to anthropic", () => {
+  const prevCfg = process.env.CASPROOF_MODELS;
+  const prevModels = process.env.QUORUM_MODELS;
+  delete process.env.CASPROOF_MODELS;
+  process.env.QUORUM_MODELS = "m1:./keys/1.pem,m2:./keys/2.pem";
+  try {
+    const agents = modelAgents();
+    assert.deepEqual(agents.map((a) => a.modelId), ["m1", "m2"]);
+    assert.equal(agents[0].provider, "anthropic");
+  } finally {
+    if (prevCfg === undefined) delete process.env.CASPROOF_MODELS;
+    else process.env.CASPROOF_MODELS = prevCfg;
+    if (prevModels === undefined) delete process.env.QUORUM_MODELS;
+    else process.env.QUORUM_MODELS = prevModels;
+  }
+});
+
+test("an offline provider returns null so the producer uses the deterministic valuation", async () => {
+  const out = await generate({ modelId: "x", provider: "offline" }, "anything");
+  assert.equal(out.payload, null);
+  assert.equal(out.source, "offline");
+});
+
+test("a failed/unreachable provider degrades to offline (never throws)", async () => {
+  const out = await generate(
+    { modelId: "x", provider: "openai", baseUrl: "http://127.0.0.1:1/v1" },
+    "anything"
+  );
+  assert.equal(out.payload, null);
+  assert.equal(out.source, "offline");
+});
+
+test("produceFeed is deterministic offline and honest agents agree byte-for-byte", async () => {
+  const a = await produceFeed({ modelId: "a", provider: "offline", keyPath: "./keys/a.pem" });
+  const b = await produceFeed({ modelId: "b", provider: "offline", keyPath: "./keys/b.pem" });
+  assert.deepEqual(a.payload, valuate(RWA_INPUTS));
+  assert.equal(outputHash(a), outputHash(b));
+});
+
+test("a tampered offline produceFeed diverges from the honest hash", async () => {
+  const honest = await produceFeed({ modelId: "a", provider: "offline", keyPath: "./keys/a.pem" });
+  const tampered = await produceFeed({ modelId: "a", provider: "offline", keyPath: "./keys/a.pem" }, { tamper: true });
+  assert.notEqual(outputHash(honest), outputHash(tampered));
 });
 
 test("stateItemKey matches the Odra storage-key derivation vector", () => {

@@ -189,6 +189,18 @@ cp .env.example .env.local       # CASPER_CHAIN_RPC + REGISTRY_CONTRACT_HASH
 npm run dev                      # http://localhost:3000
 ```
 
+### Run with Docker
+
+Bring up the x402 verify server (and optionally the dashboard) on any machine with one command — no local Node toolchain needed.
+
+```bash
+cp .env.example .env             # then set REGISTRY_CONTRACT_HASH + CASPER_CHAIN_RPC after deploy
+docker compose up                # verify server on http://localhost:4021/verify
+docker compose --profile ui up   # also build + serve the dashboard on http://localhost:3000
+```
+
+Config is read from the root `.env` (mounted via `env_file`, never baked into an image). Testnet keys under `agents/keys/` stay on the host and are excluded from every image by `.dockerignore`. The `verify` service has a healthcheck; `X402_MODE` defaults to `sim`, so it runs out of the box before you wire up the hosted x402 facilitator. See [docs/docker.md](docs/docker.md) for ports, profiles, and configuration notes.
+
 ## Why Casper
 
 - **The WASM VM is the enforcement surface.** Cross-contract calls in Casper's WASM runtime are atomic within a single deploy. That is what makes `require_quorum` an unskippable gate rather than a strongly-suggested check. On EVM chains the same pattern is possible but incurs full CALL overhead; on off-chain systems it is advisory. On Casper it is a revert or it does not happen.

@@ -38,7 +38,7 @@ async function main() {
 
   const consumerKey = loadKey(process.env.CONSUMER_KEY_PATH ?? "./keys/consumer_secret_key.pem");
   const beneficiary = consumerKey.publicKey.accountHash().toPrefixedString();
-  const genuineFeed = await produceFeed(agents[0].modelId);
+  const genuineFeed = await produceFeed(agents[0]);
 
   console.log("\n3. autonomous consumer releases the payout against the genuine output");
   const paid = await autonomousRelease(reqId, genuineFeed, beneficiary, { tries: 4 });
@@ -46,7 +46,7 @@ async function main() {
   if (paid.explorer) console.log(`   tx: ${paid.explorer}`);
 
   console.log("\n4. an attacker poisons the feed (one byte changed) and retries the payout");
-  const poisonedFeed = await produceFeed(agents[0].modelId, { tamper: true });
+  const poisonedFeed = await produceFeed(agents[0], { tamper: true });
   console.log(`   poisoned hash ${outputHash(poisonedFeed).slice(0, 24)}… ≠ quorum hash`);
   const blocked = await autonomousRelease(reqId, poisonedFeed, beneficiary, { tries: 1 });
   console.log(`   → ${blocked.decision}: ${blocked.reason}`);

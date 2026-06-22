@@ -19,6 +19,7 @@
     "x402:server": "tsx src/server.ts",
     "x402:verify": "tsx src/payVerify.ts",
     "mcp": "tsx src/mcp.ts",
+    "doctor": "tsx src/doctor.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test src/agents.test.ts"
   },

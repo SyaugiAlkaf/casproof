@@ -1,0 +1,25 @@
+{
+  "threshold": 2,
+  "agents": [
+    {
+      "modelId": "llama3.1",
+      "provider": "openai",
+      "keyPath": "./keys/producer_secret_key.pem",
+      "baseUrl": "http://localhost:11434/v1",
+      "apiKeyEnv": "OLLAMA_API_KEY",
+      "temperature": 0
+    },
+    {
+      "modelId": "claude-opus-4-8",
+      "provider": "anthropic",
+      "keyPath": "./keys/producer2_secret_key.pem",
+      "apiKeyEnv": "ANTHROPIC_API_KEY",
+      "temperature": 0
+    },
+    {
+      "modelId": "deterministic-fallback",
+      "provider": "offline",
+      "keyPath": "./keys/producer3_secret_key.pem"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Never bake secrets into the image
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Build / dependency artifacts (rebuilt inside the image)
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+.vercel
+.DS_Store

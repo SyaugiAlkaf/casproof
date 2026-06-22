@@ -1,0 +1,23 @@
+[
+  {
+    "id": "llama3-local",
+    "type": "ollama",
+    "baseUrl": "http://localhost:11434",
+    "model": "llama3",
+    "note": "Requires: ollama pull llama3"
+  },
+  {
+    "id": "mistral-lmstudio",
+    "type": "openai_compat",
+    "baseUrl": "http://localhost:1234/v1",
+    "model": "mistral-7b-instruct",
+    "note": "Requires: LM Studio running with the model loaded and the local server enabled"
+  },
+  {
+    "id": "phi3-ollama",
+    "type": "ollama",
+    "baseUrl": "http://localhost:11434",
+    "model": "phi3",
+    "note": "Requires: ollama pull phi3"
+  }
+]

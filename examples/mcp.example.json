@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "casproof": {
+      "command": "node",
+      "args": [
+        "--import", "tsx",
+        "/absolute/path/to/casproof/agents/src/mcp.ts"
+      ],
+      "env": {
+        "REGISTRY_CONTRACT_HASH": "hash-<your-registry-contract-hash>",
+        "CASPER_CHAIN_RPC": "https://node.testnet.casper.network/rpc",
+        "CASPER_NETWORK_NAME": "casper-test",
+        "TRUSTED_SIGNERS": "0202<signer-pubkey-hex-1>,0202<signer-pubkey-hex-2>",
+        "QUORUM_THRESHOLD": "2"
+      }
+    }
+  }
+}

@@ -14,6 +14,7 @@ const {
   ContractCallBuilder,
   ParamDictionaryIdentifier,
   ParamDictionaryIdentifierURef,
+  PurseIdentifier,
 } = sdk;
 type PrivateKey = InstanceType<typeof sdk.PrivateKey>;
 
@@ -287,6 +288,40 @@ export function isTrusted(signer: string): boolean {
 
 export function explorerTxUrl(txHash: string): string {
   return `${EXPLORER}/deploy/${txHash}`;
+}
+
+export const rpcUrl = NODE_URL;
+export const registryHash = CONTRACT_HASH;
+export const vaultHash = VAULT_HASH;
+
+export interface NodeStatus {
+  apiVersion: string;
+  chainName: string;
+}
+
+// Cheapest read that proves the RPC is reachable and tells us which network it serves.
+export async function pingNode(): Promise<NodeStatus> {
+  if (!NODE_URL) throw new Error("CASPER_CHAIN_RPC / CASPER_NODE_URL not set");
+  const status = await rpc.getStatus();
+  return { apiVersion: status.apiVersion, chainName: status.chainSpecName };
+}
+
+// Latest available balance in motes for a key's main purse, read-only.
+export async function balanceMotes(pemPath: string): Promise<bigint> {
+  const key = loadKey(pemPath);
+  const res = await rpc.queryLatestBalance(PurseIdentifier.fromPublicKey(key.publicKey));
+  return BigInt(res.balance.toString());
+}
+
+export function accountHashOf(pemPath: string): string {
+  return loadKey(pemPath).publicKey.accountHash().toPrefixedString();
+}
+
+// Resolves a deployed contract's state seed uref straight from the node — proves the
+// REGISTRY_CONTRACT_HASH points at a real, queryable contract. Read-only.
+export async function contractReachable(): Promise<boolean> {
+  await resolveStateUref();
+  return true;
 }
 
 async function findAttestationViaEvents(outputHash: string): Promise<AttestationRecord | null> {

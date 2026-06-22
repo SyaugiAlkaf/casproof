@@ -1,0 +1,35 @@
+# Repo-root guard. Build contexts are ./agents and ./ui (each has its own
+# .dockerignore); this keeps secrets and heavy build caches out of any
+# root-context build too.
+.env
+.env.*
+!.env.example
+**/keys/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+.vault-token
+
+# Node
+**/node_modules/
+**/dist/
+**/.next/
+**/*.tsbuildinfo
+**/npm-debug.log*
+
+# Rust / Odra build output and caches
+contract/target/
+contract/wasm/
+contract/.backend*
+contract/.builder*
+
+# Claude planning artifacts (never ship)
+CLAUDE.md
+HANDOFF.md
+auto_handoff_latest.md
+.claude/
+
+# Git + OS
+.git/
+.DS_Store

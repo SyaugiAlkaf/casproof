@@ -1,0 +1,20 @@
+# Never bake secrets or local state into the image
+.env
+.env.*
+!.env.example
+keys/
+*.pem
+*.key
+*.p12
+*.pfx
+.vault-token
+
+# Build / dependency artifacts (reinstalled inside the image)
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+
+# Local tooling
+mcp.example.json
+.DS_Store

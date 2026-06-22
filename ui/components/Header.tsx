@@ -5,8 +5,10 @@ export default function Header() {
     <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-ink-950/70 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 sm:px-8">
         <div className="flex items-center gap-3">
-          <Wordmark />
-          <div className="hidden h-8 w-px bg-white/8 sm:block" />
+          <a href="#main" aria-label="Casproof home" className="rounded-lg">
+            <Wordmark />
+          </a>
+          <div className="hidden h-8 w-px bg-white/10 sm:block" aria-hidden />
           <p className="hidden text-[13px] text-slate-400 sm:block">
             Verify-before-act firewall for AI agents on Casper
           </p>

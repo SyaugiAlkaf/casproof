@@ -47,10 +47,14 @@ export default function QuorumContrast() {
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="mb-2 flex items-center gap-2">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
             <Pill tone="neutral">action firewall · Casper VM</Pill>
             <Pill tone={liveQuorumConfigured ? "good" : "muted"}>
-              {liveQuorumConfigured ? "live chain state" : "illustrative"}
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${liveQuorumConfigured ? "bg-mint" : "bg-signal-amber"}`}
+                aria-hidden
+              />
+              {liveQuorumConfigured ? "live chain state" : "illustrative mode"}
             </Pill>
           </div>
           <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
@@ -62,7 +66,7 @@ export default function QuorumContrast() {
             policy here is quorum: k independent signers attest the same deterministic valuation. Change one byte
             and that output has no quorum, so require_quorum reverts and the release with it.
           </p>
-          <p className="mt-2 max-w-xl text-[12px] leading-relaxed text-slate-500">
+          <p className="mt-2 max-w-xl text-pretty text-[12px] leading-relaxed text-slate-400">
             Quorum is one pluggable policy behind the gate — TEE remote-attestation receipts and zkML proofs are on
             the roadmap. Today the trusted signer set is owner-curated and slashing gives it skin in the game;
             proof-of-computation receipts come next.
@@ -78,15 +82,21 @@ export default function QuorumContrast() {
           <button
             onClick={run}
             disabled={genuine.loading || poisoned.loading}
-            className="group inline-flex items-center gap-2 rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-ink-950 transition hover:bg-mint-soft disabled:opacity-70"
+            aria-busy={genuine.loading || poisoned.loading}
+            aria-label="Run both outputs through the on-chain quorum gate"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-ink-950 shadow-[0_8px_24px_-12px_rgba(52,211,153,0.6)] transition-all hover:bg-mint-soft focus-visible:outline-offset-4 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
           >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full"
+            />
             {genuine.loading || poisoned.loading ? <Spinner className="h-4 w-4" /> : <ScaleGlyph />}
             {genuine.loading || poisoned.loading ? "Reading chain…" : "Run the gate"}
           </button>
           {ran && (
             <button
               onClick={reset}
-              className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm text-slate-400 transition hover:border-white/20 hover:text-slate-200"
+              className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm text-slate-300 transition hover:border-white/20 hover:text-slate-100 active:scale-[0.98]"
             >
               Reset
             </button>
@@ -94,7 +104,7 @@ export default function QuorumContrast() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2" role="group" aria-live="polite" aria-label="Quorum gate outcomes">
         <QuorumLane
           title="Genuine valuation"
           subtitle="Quorum-attested output"
@@ -172,7 +182,7 @@ function QuorumLane({
           <span className={`h-2 w-2 rounded-full ${poisoned ? "bg-signal-red/70" : "bg-mint/70"} ${lane.loading ? "animate-pulse" : ""}`} />
           <div>
             <div className="text-sm font-semibold text-slate-200">{title}</div>
-            <div className="text-[11px] text-slate-500">{subtitle}</div>
+            <div className="text-[11px] text-slate-400">{subtitle}</div>
           </div>
         </div>
         {settled ? (
@@ -218,7 +228,7 @@ function LaneOutcome({
   txUrl?: string;
   txLabel: string;
 }) {
-  if (!ran) return <div className="text-[12px] text-slate-600">awaiting quorum read…</div>;
+  if (!ran) return <div className="text-[12px] text-slate-500">awaiting quorum read…</div>;
   if (lane.loading) {
     return (
       <div className="flex items-center gap-2 text-[12px] text-slate-400">
@@ -238,7 +248,7 @@ function LaneOutcome({
           <div className={`text-sm font-bold tracking-tight ${q.pays ? "text-mint-soft" : "text-signal-red"}`}>
             {q.pays ? "QUORUM → PAY" : "NO QUORUM → BLOCK"}
           </div>
-          <div className="text-[11px] text-slate-500">{q.reason}</div>
+          <div className="text-[11px] text-slate-400">{q.reason}</div>
         </div>
       </div>
       {q.pays && txUrl ? (
@@ -270,14 +280,29 @@ function FooterLinks({ ran, genuine, poisoned }: { ran: boolean; genuine: Lane; 
 
   if (!liveQuorumConfigured) {
     return (
-      <div className="mt-5 flex items-start gap-3 rounded-xl border border-signal-amber/25 bg-signal-amber/[0.06] px-4 py-3 text-sm text-signal-amber/90">
-        <InfoGlyph />
-        <span>
-          Illustrative view. Set <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[12px] text-slate-200">NEXT_PUBLIC_REGISTRY_CONTRACT_HASH</code>{" "}
-          and <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[12px] text-slate-200">NEXT_PUBLIC_REQUEST_ID</code>{" "}
-          (plus the server <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[12px] text-slate-200">REGISTRY_CONTRACT_HASH</code> /{" "}
-          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[12px] text-slate-200">REQUEST_ID</code>) after deploying to read genuine quorum state.
-        </span>
+      <div
+        role="note"
+        className="mt-5 rounded-xl border border-signal-amber/25 bg-signal-amber/[0.06] px-4 py-3.5 text-sm"
+      >
+        <div className="flex items-center gap-2.5 font-semibold text-signal-amber">
+          <InfoGlyph />
+          Illustrative mode — this is how the gate behaves once a contract is live
+        </div>
+        <p className="mt-2 pl-[26px] text-[13px] leading-relaxed text-slate-300">
+          The two outcomes below are the real decision logic running against sample data. No transaction hashes are
+          shown until a registry is deployed.
+        </p>
+        <p className="mt-2 pl-[26px] text-[12px] leading-relaxed text-slate-400">
+          To read genuine quorum state, set{" "}
+          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">NEXT_PUBLIC_REGISTRY_CONTRACT_HASH</code>{" "}
+          and{" "}
+          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">NEXT_PUBLIC_REQUEST_ID</code>{" "}
+          (plus the server{" "}
+          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">REGISTRY_CONTRACT_HASH</code>{" "}
+          /{" "}
+          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">REQUEST_ID</code>){" "}
+          after deploying.
+        </p>
       </div>
     );
   }
@@ -348,14 +373,14 @@ function illustrative(verdict: "pay" | "block", result: VerifyResult | null): Qu
 function Row({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
+      <span className="shrink-0 text-slate-400">{label}</span>
       <span
-        className={`tabular-nums transition-colors ${
+        className={`min-w-0 truncate text-right tabular-nums transition-colors ${
           highlight ? "rounded bg-signal-red/15 px-1.5 py-0.5 font-semibold text-signal-red" : "text-slate-300"
         }`}
       >
         {value}
-        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-signal-red/70">tampered</span>}
+        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-signal-red/80">tampered</span>}
       </span>
     </div>
   );

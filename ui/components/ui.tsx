@@ -16,14 +16,17 @@ export function HashChip({ hash, label = "output hash" }: { hash: string; label?
   return (
     <button
       onClick={copy}
-      title="Copy hash"
-      className="group flex w-full items-center gap-3 rounded-xl border border-white/8 bg-ink-950/60 px-3.5 py-2.5 text-left transition hover:border-white/16"
+      aria-label={`Copy ${label} ${hash}`}
+      className="group flex w-full items-center gap-3 rounded-xl border border-white/8 bg-ink-950/60 px-3.5 py-2.5 text-left transition hover:border-white/16 focus-visible:border-mint/40"
     >
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
         {label}
       </span>
       <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-300">{hash}</code>
-      <span className="shrink-0 text-[11px] font-medium text-slate-500 transition group-hover:text-mint-soft">
+      <span
+        aria-live="polite"
+        className={`shrink-0 text-[11px] font-medium transition ${copied ? "text-mint-soft" : "text-slate-400 group-hover:text-mint-soft"}`}
+      >
         {copied ? "copied ✓" : "copy"}
       </span>
     </button>
@@ -36,7 +39,7 @@ const toneRing: Record<Tone, string> = {
   neutral: "border-white/10 bg-white/[0.03] text-slate-300",
   good: "border-mint/35 bg-mint/[0.08] text-mint-soft",
   bad: "border-signal-red/35 bg-signal-red/[0.08] text-signal-red",
-  muted: "border-white/8 bg-white/[0.02] text-slate-500"
+  muted: "border-white/8 bg-white/[0.02] text-slate-400"
 };
 
 export function Pill({ tone = "neutral", children }: { tone?: Tone; children: React.ReactNode }) {

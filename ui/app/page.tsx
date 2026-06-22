@@ -10,37 +10,59 @@ const REPO_URL = "https://github.com/SyaugiAlkaf/casproof";
 export default function Page() {
   return (
     <div className="relative min-h-screen">
+      <a
+        href="#verify"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-mint focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-ink-950"
+      >
+        Skip to the verify gate
+      </a>
       <Backdrop />
       <Header />
 
-      <main className="relative z-10 mx-auto max-w-6xl px-5 pb-24 pt-12 sm:px-8 sm:pt-16">
-        <section className="mb-12 max-w-3xl">
-          <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-mint" />
+      <main id="main" className="relative z-10 mx-auto max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
+        <section aria-labelledby="hero-title" className="mb-14 max-w-3xl">
+          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-mint/20 bg-mint/[0.05] px-3 py-1.5 text-xs font-medium text-mint-soft">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
+            </span>
             Casper testnet · verify-before-act for AI agents
           </div>
-          <h1 className="text-balance text-4xl font-semibold leading-[1.08] tracking-tight text-slate-50 sm:text-5xl">
+          <h1
+            id="hero-title"
+            className="text-balance text-[2.5rem] font-semibold leading-[1.05] tracking-tight text-slate-50 sm:text-[3.25rem]"
+          >
             The unskippable on-chain{" "}
             <span className="bg-gradient-to-r from-mint-soft to-mint bg-clip-text text-transparent">
               action firewall
             </span>{" "}
             for AI agents.
           </h1>
-          <p className="mt-5 max-w-2xl text-balance text-base leading-relaxed text-slate-400 sm:text-lg">
-            Casproof runs the verify decision and the value-bearing action in one atomic Casper VM call, so an
-            off-chain agent cannot skip the check. The proof of computation is pluggable; the unskippable
-            on-chain settlement gate is enforced in the Casper VM. Demo it on an RWA payout: poison the feed and
-            the release reverts — provably, in public.
+          <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-slate-300 sm:text-lg">
+            Casproof settles the verify decision and the value-bearing action in one atomic Casper VM call — so an
+            off-chain agent cannot skip the check. Others score agent trust off-chain; Casproof{" "}
+            <span className="font-medium text-slate-100">enforces it on-chain</span>, and the metered verify read is
+            paid for via <span className="font-medium text-mint-soft">x402</span>.
           </p>
+          <p className="mt-4 max-w-2xl text-pretty text-[15px] leading-relaxed text-slate-400">
+            Demo it on an RWA payout: poison the feed and the release reverts — provably, in public.
+          </p>
+
+          <ul className="mt-7 flex flex-wrap gap-2.5" aria-label="What makes Casproof different">
+            <HeroChip>One atomic VM call</HeroChip>
+            <HeroChip>x402-metered verify</HeroChip>
+            <HeroChip>Pluggable attestation policy</HeroChip>
+            <HeroChip>RWA / DeFi payouts</HeroChip>
+          </ul>
         </section>
 
-        <div className="space-y-6">
+        <div className="space-y-6 scroll-mt-24" id="verify">
           <HeroVerify />
           <QuorumContrast />
           <PoisonDemo />
         </div>
 
-        <div className="mt-16">
+        <div className="mt-20">
           <HowItWorks />
         </div>
 
@@ -52,36 +74,81 @@ export default function Page() {
   );
 }
 
+function HeroChip({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[13px] text-slate-300">
+      <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-mint-soft" aria-hidden>
+        <path d="m5 12.5 4.2 4.3L19 7.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      {children}
+    </li>
+  );
+}
+
+const TOOLKIT_CHIPS = ["Odra", "casper-js-sdk", "x402", "MCP", "CSPR.click"];
+
 function Footer() {
   return (
     <footer className="relative z-10 border-t border-white/[0.06]">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-5 py-8 sm:flex-row sm:px-8">
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <span className="font-semibold text-slate-300">Casproof</span>
-          <span className="text-slate-600">·</span>
-          <span>Casper Agentic Buildathon 2026</span>
+      <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-sm">
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-semibold text-slate-100">Casproof</span>
+              <span className="text-slate-600" aria-hidden>·</span>
+              <span className="text-slate-400">verify-before-act for AI agents</span>
+            </div>
+            <p className="mt-2 text-[13px] leading-relaxed text-slate-400">
+              Built for the Casper Agentic Buildathon 2026 — the unskippable on-chain action firewall, enforced in
+              the Casper VM and paid for via x402.
+            </p>
+            <ul className="mt-4 flex flex-wrap gap-2" aria-label="Casper toolkit">
+              {TOOLKIT_CHIPS.map((chip) => (
+                <li
+                  key={chip}
+                  className="rounded-full border border-white/10 bg-white/[0.03] px-2.5 py-1 text-[11px] font-medium text-slate-300"
+                >
+                  {chip}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <nav aria-label="Footer links" className="flex flex-col gap-3 text-sm sm:flex-row sm:gap-6">
+            <a
+              href={REPO_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 rounded-lg text-slate-300 transition hover:text-mint-soft"
+            >
+              <GithubGlyph />
+              GitHub repo
+            </a>
+            <a
+              href="https://testnet.cspr.live"
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg text-slate-300 transition hover:text-mint-soft"
+            >
+              cspr.live
+              <ArrowUpRight />
+            </a>
+          </nav>
         </div>
-        <div className="flex items-center gap-5 text-sm">
-          <a
-            href={REPO_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 text-slate-400 transition hover:text-mint-soft"
-          >
-            <GithubGlyph />
-            GitHub repo
-          </a>
-          <a
-            href="https://testnet.cspr.live"
-            target="_blank"
-            rel="noreferrer"
-            className="text-slate-400 transition hover:text-mint-soft"
-          >
-            cspr.live ↗
-          </a>
-        </div>
+
+        <p className="mt-8 border-t border-white/[0.05] pt-6 text-[12px] text-slate-500">
+          Testnet demonstration. No tx hashes are shown until a contract is deployed.
+        </p>
       </div>
     </footer>
+  );
+}
+
+function ArrowUpRight() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5" aria-hidden>
+      <path d="M7 17 17 7M9 7h8v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 

@@ -64,7 +64,7 @@ export default function HeroVerify() {
             </span>
             <div>
               <h2 className="text-sm font-semibold text-slate-100">Verify an agent output</h2>
-              <p className="text-xs text-slate-500">Paste a feed — we hash it and check the on-chain registry.</p>
+              <p className="text-xs text-slate-400">Paste a feed — we hash it and check the on-chain registry.</p>
             </div>
           </div>
           <Pill tone="muted">casper-test</Pill>
@@ -85,14 +85,20 @@ export default function HeroVerify() {
           <button
             onClick={run}
             disabled={phase === "loading"}
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-mint px-5 py-3 text-sm font-semibold text-ink-950 transition hover:bg-mint-soft disabled:opacity-70"
+            aria-busy={phase === "loading"}
+            aria-label="Verify this feed against the on-chain registry"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-mint px-5 py-3 text-sm font-semibold text-ink-950 shadow-[0_8px_24px_-12px_rgba(52,211,153,0.6)] transition-all hover:bg-mint-soft hover:shadow-[0_10px_30px_-10px_rgba(52,211,153,0.7)] focus-visible:outline-offset-4 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
           >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition-transform duration-700 group-hover:translate-x-full"
+            />
             {phase === "loading" ? <Spinner className="h-4 w-4" /> : <ShieldGlyph />}
             {phase === "loading" ? "Verifying on-chain…" : "Verify on-chain"}
           </button>
           <button
             onClick={reset}
-            className="rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-400 transition hover:border-white/20 hover:text-slate-200"
+            className="rounded-xl border border-white/10 px-4 py-3 text-sm text-slate-300 transition hover:border-white/20 hover:text-slate-100 active:scale-[0.98]"
           >
             Reset sample
           </button>
@@ -105,7 +111,10 @@ export default function HeroVerify() {
         )}
 
         {phase === "error" && (
-          <div className="mt-5 flex items-start gap-3 rounded-xl border border-signal-red/25 bg-signal-red/[0.06] px-4 py-3 text-sm text-signal-red/90">
+          <div
+            role="alert"
+            className="mt-5 flex items-start gap-3 rounded-xl border border-signal-red/25 bg-signal-red/[0.06] px-4 py-3 text-sm text-signal-red"
+          >
             <CrossIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span>{message}</span>
           </div>
@@ -113,6 +122,8 @@ export default function HeroVerify() {
 
         {phase === "done" && result && (
           <div
+            role="status"
+            aria-live="polite"
             className={`mt-5 animate-[flip-in_0.45s_cubic-bezier(0.16,1,0.3,1)] overflow-hidden rounded-2xl border ${
               attested ? "border-mint/30 bg-mint/[0.05]" : "border-signal-red/30 bg-signal-red/[0.05]"
             }`}

@@ -81,15 +81,17 @@ export default function PoisonDemo() {
           <button
             onClick={() => verifyBoth(true)}
             disabled={genuine.loading || poisoned.loading}
-            className="group inline-flex items-center gap-2 rounded-xl bg-signal-red/90 px-4 py-2.5 text-sm font-semibold text-white shadow-redGlow transition hover:bg-signal-red disabled:opacity-70"
+            aria-busy={genuine.loading || poisoned.loading}
+            aria-label="Tamper the feed and run both outputs through the on-chain gate"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-signal-red/90 px-4 py-2.5 text-sm font-semibold text-white shadow-redGlow transition-all hover:bg-signal-red focus-visible:outline-offset-4 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
           >
-            <PoisonGlyph />
-            Poison the feed
+            {genuine.loading || poisoned.loading ? <Spinner className="h-4 w-4" /> : <PoisonGlyph />}
+            {genuine.loading || poisoned.loading ? "Running gate…" : "Poison the feed"}
           </button>
           {ran && (
             <button
               onClick={reset}
-              className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm text-slate-400 transition hover:border-white/20 hover:text-slate-200"
+              className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm text-slate-300 transition hover:border-white/20 hover:text-slate-100 active:scale-[0.98]"
             >
               Reset
             </button>
@@ -97,7 +99,7 @@ export default function PoisonDemo() {
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2" role="group" aria-live="polite" aria-label="Verify-before-act outcomes">
         <FeedPanel
           title="Genuine feed"
           subtitle="Producer-attested output"
@@ -184,7 +186,7 @@ function FeedPanel({
           />
           <div>
             <div className="text-sm font-semibold text-slate-200">{title}</div>
-            <div className="text-[11px] text-slate-500">{subtitle}</div>
+            <div className="text-[11px] text-slate-400">{subtitle}</div>
           </div>
         </div>
         <StatusTag loading={state.loading} settled={Boolean(settled)} attested={attested} />
@@ -221,7 +223,7 @@ function Outcome({
   ran: boolean;
 }) {
   if (!ran) {
-    return <div className="text-[12px] text-slate-600">awaiting verification…</div>;
+    return <div className="text-[12px] text-slate-500">awaiting verification…</div>;
   }
   if (state.loading) {
     return (
@@ -265,16 +267,16 @@ function Outcome({
 function Row({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="text-slate-500">{label}</span>
+      <span className="shrink-0 text-slate-400">{label}</span>
       <span
-        className={`tabular-nums transition-colors ${
+        className={`min-w-0 truncate text-right tabular-nums transition-colors ${
           highlight
             ? "rounded bg-signal-red/15 px-1.5 py-0.5 font-semibold text-signal-red"
             : "text-slate-300"
         }`}
       >
         {value}
-        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-signal-red/70">tampered</span>}
+        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-signal-red/80">tampered</span>}
       </span>
     </div>
   );

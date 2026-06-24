@@ -588,19 +588,29 @@ mod tests {
 
     #[test]
     fn c1_collision_framings_cannot_forge_quorum() {
-        // C1: one trusted signer must not forge a k-of-n quorum by exploiting an
-        // ambiguous "{request_id}#{output_hash}" agreement key. These three framings
-        // all collapsed to the same cell ("x#x#x#x") under the old key while passing
-        // the per-request `voted` guard (each has a distinct request_id).
+        // C1: one trusted signer must not forge a k-of-n quorum by exploiting an ambiguous
+        // "{request_id}#{output_hash}" key. These three framings collapsed into one counter
+        // under the old key (each has a distinct request_id, so the per-request `voted` guard
+        // let them through). Now the '#' boundary is rejected and the tally is keyed by the
+        // structured (request_id, output_hash) tuple — assert each framing records nothing.
         let env = odra_test::env();
         let mut registry = deploy(&env);
         registry.set_quorum(3);
-        let _ = registry.try_attest("x".into(), "x#x#x".into(), "m".into(), "p".into());
-        let _ = registry.try_attest("x#x".into(), "x#x".into(), "m".into(), "p".into());
-        let _ = registry.try_attest("x#x#x".into(), "x".into(), "m".into(), "p".into());
-
-        assert!(registry.quorum_of("x".into()).is_none());
-        assert!(registry.quorum_of("x#x".into()).is_none());
+        assert_eq!(
+            registry.try_attest("x".into(), "x#x#x".into(), "m".into(), "p".into()),
+            Err(Error::InvalidInput.into())
+        );
+        assert_eq!(
+            registry.try_attest("x#x".into(), "x#x".into(), "m".into(), "p".into()),
+            Err(Error::InvalidInput.into())
+        );
+        assert_eq!(
+            registry.try_attest("x#x#x".into(), "x".into(), "m".into(), "p".into()),
+            Err(Error::InvalidInput.into())
+        );
+        assert_eq!(registry.agreement_count("x".into(), "x#x#x".into()), 0);
+        assert_eq!(registry.agreement_count("x#x".into(), "x#x".into()), 0);
+        assert_eq!(registry.agreement_count("x#x#x".into(), "x".into()), 0);
         assert!(registry.quorum_of("x#x#x".into()).is_none());
         assert_eq!(
             registry.try_require_quorum("x#x#x".into(), "x".into()),

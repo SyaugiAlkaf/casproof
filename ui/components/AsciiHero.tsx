@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import FirewallHero from "./FirewallHero";
+import AsciiOrb from "./AsciiOrb";
 
 const WORDMARK_RAW = [
   " ██████╗ █████╗ ███████╗██████╗ ██████╗  ██████╗  ██████╗ ███████╗",
@@ -33,9 +33,8 @@ export default function AsciiHero() {
         <TitleBar />
         <div className="relative px-4 pb-6 pt-7 sm:px-8 sm:pb-8 sm:pt-9">
           <CrtOverlay />
-          <Wordmark />
+          <OrbStage />
           <Tagline />
-          <FirewallFrame />
         </div>
       </div>
     </section>
@@ -126,7 +125,7 @@ function Wordmark() {
       <pre
         aria-hidden="true"
         className="ascii-wordmark m-0 inline-block whitespace-pre bg-gradient-to-br from-mint-soft via-mint to-mint-deep bg-clip-text font-mono font-bold leading-[1.04] text-transparent"
-        style={{ fontSize: "clamp(4.2px, 1.78vw, 13.5px)" }}
+        style={{ fontSize: "clamp(3.4px, 1.5vw, 11px)" }}
       >
         {cells.map((row, r) => (
           <span key={r} className="block">
@@ -152,15 +151,20 @@ function Tagline() {
   );
 }
 
-function FirewallFrame() {
+function OrbStage() {
   return (
-    <div className="relative mt-6 overflow-hidden rounded-xl border border-white/[0.07] bg-ink-950/50">
-      <div className="relative h-[180px] w-full sm:h-[220px]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_120%_at_60%_50%,rgba(45,212,191,0.08)_0%,transparent_60%)]" />
-        <FirewallHero />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-ink-950/80 to-transparent" />
+    <div className="relative z-10 overflow-hidden rounded-xl border border-white/[0.07] bg-ink-950/60">
+      <div className="relative h-[300px] w-full sm:h-[400px] lg:h-[440px]">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/[0.10] blur-[90px] sm:h-[380px] sm:w-[380px]" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 h-[150px] w-[150px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint-soft/[0.08] blur-[50px]" />
+        <AsciiOrb />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-5 sm:pt-7">
+          <Wordmark />
+        </div>
+        <OrbScanlines />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-ink-950/85 to-transparent" />
       </div>
-      <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-4 py-2 sm:px-5">
+      <div className="relative flex items-center justify-between gap-3 border-t border-white/[0.06] px-4 py-2 sm:px-5">
         <span className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.18em] text-slate-500">
           <span className="relative flex h-1.5 w-1.5">
             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
@@ -171,5 +175,18 @@ function FirewallFrame() {
         <span className="font-mono text-[10px] text-slate-600">genuine → PAY · poisoned → REVERT</span>
       </div>
     </div>
+  );
+}
+
+function OrbScanlines() {
+  return (
+    <div
+      aria-hidden
+      className="pointer-events-none absolute inset-0 z-10 opacity-[0.35] mix-blend-soft-light"
+      style={{
+        backgroundImage:
+          "repeating-linear-gradient(0deg, rgba(94,234,212,0.06) 0px, rgba(94,234,212,0.06) 1px, transparent 1px, transparent 3px)"
+      }}
+    />
   );
 }

@@ -54,6 +54,8 @@ pub enum Error {
     AlreadyVoted = 5,
     InvalidQuorum = 6,
     InvalidInput = 7,
+    NotAuthorized = 8,
+    AlreadyReleased = 9,
 }
 
 /// Quorum-native attestation registry.
@@ -307,19 +309,32 @@ pub struct PayoutAuthorized {
 #[odra::module(events = [PayoutAuthorized])]
 pub struct PayoutVault {
     registry: External<RegistryContractRef>,
+    // only this address may call release (request_id/output_hash are public in events).
+    authorized: Var<Address>,
+    // one-shot guard: a request can be released at most once.
+    released: Mapping<String, bool>,
 }
 
 #[odra::module]
 impl PayoutVault {
-    pub fn init(&mut self, registry: Address) {
+    pub fn init(&mut self, registry: Address, authorized: Address) {
         self.registry.set(registry);
+        self.authorized.set(authorized);
     }
 
-    /// Authorizes a payout for `request_id` against `output_hash`. The `require_quorum`
-    /// guard reverts in-VM unless `output_hash` is the quorum-attested result, so this
-    /// returns (with the lead signer's reputation) only on a verified output.
+    /// Authorizes a payout for `request_id` against `output_hash`. Only the authorized
+    /// payer may call, and each request releases at most once. The `require_quorum` guard
+    /// reverts in-VM unless `output_hash` is the quorum-attested result, so this returns
+    /// (with the lead signer's reputation) only on a verified output to the right caller.
     pub fn release(&mut self, request_id: String, output_hash: String, beneficiary: Address) -> u64 {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
         let signer = self.registry.require_quorum(request_id.clone(), output_hash.clone());
+        if self.released.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        self.released.set(&request_id, true);
         let reputation = self.registry.reputation(signer);
         self.env().emit_event(PayoutAuthorized {
             request_id,
@@ -572,7 +587,10 @@ mod tests {
 
     fn deploy_pair(env: &HostEnv) -> (AttestationRegistryHostRef, PayoutVaultHostRef) {
         let registry = AttestationRegistry::deploy(env, NoArgs);
-        let vault = PayoutVault::deploy(env, PayoutVaultInitArgs { registry: registry.address() });
+        let vault = PayoutVault::deploy(
+            env,
+            PayoutVaultInitArgs { registry: registry.address(), authorized: env.get_account(0) },
+        );
         (registry, vault)
     }
 
@@ -588,6 +606,7 @@ mod tests {
         env.set_caller(s2);
         registry.attest("req".into(), "h".into(), "model-b".into(), "p".into());
 
+        env.set_caller(env.get_account(0));
         let beneficiary = env.get_account(3);
         let reputation = vault.release("req".into(), "h".into(), beneficiary);
         assert_eq!(reputation, 1);
@@ -618,6 +637,7 @@ mod tests {
         env.set_caller(s2);
         registry.attest("req".into(), "genuine".into(), "b".into(), "p".into());
 
+        env.set_caller(env.get_account(0));
         let beneficiary = env.get_account(3);
         assert_eq!(
             vault.try_release("req".into(), "poisoned".into(), beneficiary),
@@ -660,6 +680,48 @@ mod tests {
         assert_eq!(
             vault.try_release("req".into(), "h".into(), beneficiary),
             Err(Error::NoQuorum.into())
+        );
+    }
+
+    #[test]
+    fn h1_unauthorized_caller_cannot_release() {
+        // H1: request_id/output_hash are public (events), so only the authorized payer
+        // may call release — a stranger must not authorize a payout to themselves.
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+
+        let attacker = env.get_account(5);
+        env.set_caller(attacker);
+        assert_eq!(
+            vault.try_release("req".into(), "h".into(), attacker),
+            Err(Error::NotAuthorized.into())
+        );
+    }
+
+    #[test]
+    fn h1_release_is_one_shot() {
+        // H1: a request releases at most once — no replay of the same authorized payout.
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+
+        env.set_caller(env.get_account(0));
+        let beneficiary = env.get_account(3);
+        assert!(vault.try_release("req".into(), "h".into(), beneficiary).is_ok());
+        assert_eq!(
+            vault.try_release("req".into(), "h".into(), beneficiary),
+            Err(Error::AlreadyReleased.into())
         );
     }
 }

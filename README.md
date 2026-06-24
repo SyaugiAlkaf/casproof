@@ -78,6 +78,18 @@ The roadmap mitigation is binding attestations to proof-of-computation receipts 
 
 We do not claim the current system is computation-proof. We claim the enforcement gate is real, the audit trail is on-chain, and the copy-resistance path is clear.
 
+### Adversarially tested
+
+The core gate was audited adversarially and hardened. The verify-before-act guarantee is backed by regression tests that *reproduce* each exploit and prove it is now blocked — not just happy-path tests. `cd contract && cargo odra test` runs 26 tests (19 functional + 7 adversarial):
+
+- **Quorum forgery (C1).** A single trusted signer cannot forge a k-of-n quorum: the agreement tally is keyed by a structured `(request_id, output_hash)` tuple with per-signer dedup, and `attest` rejects the `#` separator — so ambiguous framings can no longer collide into one counter. *(`c1_collision_framings_cannot_forge_quorum`, `c1_attest_rejects_separator_in_inputs`)*
+- **Revocable quorum (C2).** `require_quorum` re-counts only signers who are *still trusted* at call time, so slashing the colluders who reached a quorum revokes it for as long as they stay untrusted — a poisoned output cannot pass the gate while its backers are slashed. The gate reflects live trust in both directions by design. *(`c2_slashing_revokes_a_reached_quorum`)*
+- **Authorized, one-shot payout (H1).** `PayoutVault.release` is callable only by the authorized payer and at most once per request, so a public `request_id`/`output_hash` cannot be replayed or redirected by a stranger. *(`h1_unauthorized_caller_cannot_release`, `h1_release_is_one_shot`)*
+- **Real value through the gate (M2).** The vault escrows CSPR per request (beneficiary bound on-chain at deposit) and transfers it only after `require_quorum` passes — a poisoned or under-quorum release reverts *before a single mote moves*. *(`m2_release_moves_escrowed_funds_only_on_quorum`)*
+- **Stable threshold (M1).** The quorum threshold is snapshotted at a request's first attestation, so lowering `set_quorum` cannot retroactively seal an under-quorum in-flight request. *(`m1_lowering_threshold_cannot_seal_an_inflight_request`)*
+
+The lead signer returned by the gate is bound to a still-trusted signer who attested *that* request, so reputation is attributed correctly.
+
 ### Reputation
 
 `reputation(signer)` returns `attestation_count - slashes` for any signer. It increases when a signer attests honestly and decreases when the owner slashes them. It cannot overflow (saturating subtraction). It is emitted in every `PayoutAuthorized` event, giving downstream consumers a portable on-chain quality signal about the signers behind the output they are acting on.

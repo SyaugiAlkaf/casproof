@@ -204,7 +204,7 @@ test("x402 server returns 402 unpaid, opens the gate once paid (sim mode)", asyn
   }
 });
 
-test("mcp server exposes the casproof tools and computes a correct hash", async () => {
+test("mcp server is read-only by default and computes a correct hash", async () => {
   const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
   const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
   const transport = new StdioClientTransport({ command: "npx", args: ["tsx", "src/mcp.ts"] });
@@ -212,13 +212,37 @@ test("mcp server exposes the casproof tools and computes a correct hash", async 
   await client.connect(transport);
   try {
     const tools = (await client.listTools()).tools.map((t) => t.name);
-    assert.deepEqual(tools.sort(), ["casproof_attest", "casproof_compute_hash", "casproof_verify_output"]);
+    assert.deepEqual(tools.sort(), ["casproof_compute_hash", "casproof_verify_output"]);
     const res = await client.callTool({
       name: "casproof_compute_hash",
       arguments: { modelId: "claude-opus-4-8", prompt: "p", payload: { asset: "PARK-NOTE-001", fairValueUsd: 1234567, confidence: 0.82 } },
     });
     const out = JSON.parse((res.content as Array<{ text: string }>)[0].text);
     assert.equal(out.outputHash, HASH_VECTOR);
+  } finally {
+    await client.close();
+  }
+});
+
+test("mcp attest tool registers only when CASPROOF_MCP_ALLOW_ATTEST=true", async () => {
+  const { Client } = await import("@modelcontextprotocol/sdk/client/index.js");
+  const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
+  const transport = new StdioClientTransport({
+    command: "npx",
+    args: ["tsx", "src/mcp.ts"],
+    env: { ...process.env, CASPROOF_MCP_ALLOW_ATTEST: "true", CASPROOF_MCP_ATTEST_TOKEN: "test-token" },
+  });
+  const client = new Client({ name: "test", version: "0" });
+  await client.connect(transport);
+  try {
+    const tools = (await client.listTools()).tools.map((t) => t.name);
+    assert.deepEqual(tools.sort(), ["casproof_attest", "casproof_compute_hash", "casproof_verify_output"]);
+    const res = await client.callTool({
+      name: "casproof_attest",
+      arguments: { modelId: "claude-opus-4-8", prompt: "p", payload: { asset: "X" }, token: "wrong" },
+    });
+    const out = JSON.parse((res.content as Array<{ text: string }>)[0].text);
+    assert.match(out.error, /unauthorized/);
   } finally {
     await client.close();
   }

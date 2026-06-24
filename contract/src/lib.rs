@@ -3,6 +3,7 @@
 extern crate alloc;
 
 use odra::prelude::*;
+use odra::casper_types::U512;
 
 /// A single agent's attestation of an AI output. One record is kept per distinct
 /// `output_hash` (the first signer to attest it writes the record); `reputation`
@@ -309,10 +310,14 @@ pub struct PayoutAuthorized {
 #[odra::module(events = [PayoutAuthorized])]
 pub struct PayoutVault {
     registry: External<RegistryContractRef>,
-    // only this address may call release (request_id/output_hash are public in events).
+    // only this address may deposit/release (request_id/output_hash are public in events).
     authorized: Var<Address>,
     // one-shot guard: a request can be released at most once.
     released: Mapping<String, bool>,
+    // CSPR held in the vault purse per request, paid to the bound beneficiary on release.
+    escrow: Mapping<String, U512>,
+    // beneficiary bound on-chain at deposit time (never a free-form release arg).
+    beneficiary: Mapping<String, Address>,
 }
 
 #[odra::module]
@@ -322,11 +327,24 @@ impl PayoutVault {
         self.authorized.set(authorized);
     }
 
-    /// Authorizes a payout for `request_id` against `output_hash`. Only the authorized
-    /// payer may call, and each request releases at most once. The `require_quorum` guard
-    /// reverts in-VM unless `output_hash` is the quorum-attested result, so this returns
-    /// (with the lead signer's reputation) only on a verified output to the right caller.
-    pub fn release(&mut self, request_id: String, output_hash: String, beneficiary: Address) -> u64 {
+    /// Escrows the attached CSPR for `request_id` and binds the `beneficiary` on-chain.
+    /// The value is held in the vault purse until release; binding the beneficiary here
+    /// (not at release time) stops any caller from redirecting a verified payout.
+    #[odra(payable)]
+    pub fn deposit(&mut self, request_id: String, beneficiary: Address) {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
+        let prior = self.escrow.get(&request_id).unwrap_or_default();
+        self.escrow.set(&request_id, prior + self.env().attached_value());
+        self.beneficiary.set(&request_id, beneficiary);
+    }
+
+    /// Releases the escrowed payout for `request_id` to its bound beneficiary. Only the
+    /// authorized payer may call, and each request releases at most once. `require_quorum`
+    /// reverts in-VM unless `output_hash` is the quorum-attested result, so a poisoned or
+    /// under-quorum output reverts before a single mote moves.
+    pub fn release(&mut self, request_id: String, output_hash: String) -> u64 {
         if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
             self.env().revert(Error::NotAuthorized);
         }
@@ -335,6 +353,11 @@ impl PayoutVault {
             self.env().revert(Error::AlreadyReleased);
         }
         self.released.set(&request_id, true);
+        let beneficiary = self.beneficiary.get(&request_id).unwrap_or_revert(&self.env());
+        let amount = self.escrow.get(&request_id).unwrap_or_default();
+        if amount > U512::zero() {
+            self.env().transfer_tokens(&beneficiary, &amount);
+        }
         let reputation = self.registry.reputation(signer);
         self.env().emit_event(PayoutAuthorized {
             request_id,
@@ -350,7 +373,7 @@ impl PayoutVault {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use odra::host::{Deployer, HostEnv, NoArgs};
+    use odra::host::{Deployer, HostEnv, HostRef, NoArgs};
 
     fn deploy(env: &HostEnv) -> AttestationRegistryHostRef {
         AttestationRegistry::deploy(env, NoArgs)
@@ -602,13 +625,15 @@ mod tests {
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
 
+        let beneficiary = env.get_account(3);
+        vault.with_tokens(U512::from(1_000_000_000u64)).deposit("req".into(), beneficiary);
+
         registry.attest("req".into(), "h".into(), "model-a".into(), "p".into());
         env.set_caller(s2);
         registry.attest("req".into(), "h".into(), "model-b".into(), "p".into());
 
         env.set_caller(env.get_account(0));
-        let beneficiary = env.get_account(3);
-        let reputation = vault.release("req".into(), "h".into(), beneficiary);
+        let reputation = vault.release("req".into(), "h".into());
         assert_eq!(reputation, 1);
     }
 
@@ -618,9 +643,8 @@ mod tests {
         let (mut registry, mut vault) = deploy_pair(&env);
         registry.set_quorum(2);
         registry.attest("req".into(), "h".into(), "m".into(), "p".into());
-        let beneficiary = env.get_account(3);
         assert_eq!(
-            vault.try_release("req".into(), "h".into(), beneficiary),
+            vault.try_release("req".into(), "h".into()),
             Err(Error::NoQuorum.into())
         );
     }
@@ -633,17 +657,19 @@ mod tests {
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
 
+        let beneficiary = env.get_account(3);
+        vault.with_tokens(U512::from(1_000_000_000u64)).deposit("req".into(), beneficiary);
+
         registry.attest("req".into(), "genuine".into(), "a".into(), "p".into());
         env.set_caller(s2);
         registry.attest("req".into(), "genuine".into(), "b".into(), "p".into());
 
         env.set_caller(env.get_account(0));
-        let beneficiary = env.get_account(3);
         assert_eq!(
-            vault.try_release("req".into(), "poisoned".into(), beneficiary),
+            vault.try_release("req".into(), "poisoned".into()),
             Err(Error::NoQuorum.into())
         );
-        assert!(vault.try_release("req".into(), "genuine".into(), beneficiary).is_ok());
+        assert!(vault.try_release("req".into(), "genuine".into()).is_ok());
     }
 
     #[test]
@@ -676,9 +702,8 @@ mod tests {
             registry.try_require_quorum("req".into(), "h".into()),
             Err(Error::NoQuorum.into())
         );
-        let beneficiary = env.get_account(4);
         assert_eq!(
-            vault.try_release("req".into(), "h".into(), beneficiary),
+            vault.try_release("req".into(), "h".into()),
             Err(Error::NoQuorum.into())
         );
     }
@@ -699,7 +724,7 @@ mod tests {
         let attacker = env.get_account(5);
         env.set_caller(attacker);
         assert_eq!(
-            vault.try_release("req".into(), "h".into(), attacker),
+            vault.try_release("req".into(), "h".into()),
             Err(Error::NotAuthorized.into())
         );
     }
@@ -712,16 +737,49 @@ mod tests {
         registry.set_quorum(2);
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
+        let beneficiary = env.get_account(3);
+        vault.with_tokens(U512::from(1_000_000_000u64)).deposit("req".into(), beneficiary);
         registry.attest("req".into(), "h".into(), "a".into(), "p".into());
         env.set_caller(s2);
         registry.attest("req".into(), "h".into(), "b".into(), "p".into());
 
         env.set_caller(env.get_account(0));
-        let beneficiary = env.get_account(3);
-        assert!(vault.try_release("req".into(), "h".into(), beneficiary).is_ok());
+        assert!(vault.try_release("req".into(), "h".into()).is_ok());
         assert_eq!(
-            vault.try_release("req".into(), "h".into(), beneficiary),
+            vault.try_release("req".into(), "h".into()),
             Err(Error::AlreadyReleased.into())
         );
+    }
+
+    #[test]
+    fn m2_release_moves_escrowed_funds_only_on_quorum() {
+        // M2: the vault holds a real purse. A poisoned/under-quorum release reverts before
+        // any mote moves; a quorum-attested release transfers exactly the escrowed amount.
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+
+        let beneficiary = env.get_account(3);
+        let amount = U512::from(2_000_000_000u64);
+        vault.with_tokens(amount).deposit("req".into(), beneficiary);
+        let before = env.balance_of(&beneficiary);
+
+        // one of two signers — no quorum: release reverts and moves nothing
+        registry.attest("req".into(), "genuine".into(), "a".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(
+            vault.try_release("req".into(), "genuine".into()),
+            Err(Error::NoQuorum.into())
+        );
+        assert_eq!(env.balance_of(&beneficiary), before);
+
+        // quorum reached — release transfers exactly the escrowed amount
+        env.set_caller(s2);
+        registry.attest("req".into(), "genuine".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert!(vault.try_release("req".into(), "genuine".into()).is_ok());
+        assert_eq!(env.balance_of(&beneficiary), before + amount);
     }
 }

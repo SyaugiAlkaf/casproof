@@ -86,6 +86,9 @@ pub struct AttestationRegistry {
     // the agreeing signers per pair, indexed 1..=agreement, so the gate can re-count
     // how many are STILL trusted at call time (a slashed signer no longer counts).
     agree_signers: Mapping<(String, String, u32), Address>,
+    // threshold snapshotted at a request's first attestation; a later set_quorum affects
+    // only NEW requests, never retroactively (un)seals an in-flight one.
+    req_threshold: Mapping<String, u32>,
     // winning output hash once quorum is reached, keyed by request_id.
     quorum_output: Mapping<String, String>,
     // one-vote-per-signer-per-request guard, keyed by (request_id, signer).
@@ -170,7 +173,15 @@ impl AttestationRegistry {
             timestamp,
         });
 
-        let threshold = self.quorum_threshold.get().unwrap_or(1);
+        // Snapshot the threshold this request was opened under, on its first attestation.
+        let threshold = match self.req_threshold.get(&request_id) {
+            Some(t) => t,
+            None => {
+                let t = self.quorum_threshold.get().unwrap_or(1);
+                self.req_threshold.set(&request_id, t);
+                t
+            }
+        };
         if agreed >= threshold && self.quorum_output.get(&request_id).is_none() {
             self.quorum_output.set(&request_id, output_hash.clone());
             self.env().emit_event(QuorumReached {
@@ -204,7 +215,10 @@ impl AttestationRegistry {
             Some(winner) if winner == output_hash => {
                 let pair = (request_id.clone(), output_hash.clone());
                 let count = self.agreement.get(&pair).unwrap_or(0);
-                let threshold = self.quorum_threshold.get().unwrap_or(1);
+                let threshold = self
+                    .req_threshold
+                    .get(&request_id)
+                    .unwrap_or_else(|| self.quorum_threshold.get().unwrap_or(1));
                 let mut still_trusted = 0u32;
                 let mut lead: Option<Address> = None;
                 let mut i = 1u32;
@@ -781,5 +795,36 @@ mod tests {
         env.set_caller(env.get_account(0));
         assert!(vault.try_release("req".into(), "genuine".into()).is_ok());
         assert_eq!(env.balance_of(&beneficiary), before + amount);
+    }
+
+    #[test]
+    fn m1_lowering_threshold_cannot_seal_an_inflight_request() {
+        // M1: the threshold a request was opened under is snapshotted at first attestation,
+        // so a later set_quorum cannot retroactively seal an under-quorum in-flight request.
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        registry.set_quorum(3);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+
+        // request opened under threshold 3; one signer attests "bad"
+        registry.attest("req".into(), "bad".into(), "a".into(), "p".into());
+        assert!(registry.quorum_of("req".into()).is_none());
+
+        // owner lowers the live threshold mid-flight
+        registry.set_quorum(2);
+
+        // a second signer attests the same hash → agreed=2. Under the lowered LIVE threshold
+        // this would seal (2 >= 2); under the per-request snapshot (3) it must NOT.
+        env.set_caller(s2);
+        registry.attest("req".into(), "bad".into(), "b".into(), "p".into());
+        assert!(registry.quorum_of("req".into()).is_none());
+
+        // a NEW request opened after the lowering legitimately seals at the new threshold (2)
+        env.set_caller(env.get_account(0));
+        registry.attest("req2".into(), "g".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req2".into(), "g".into(), "b".into(), "p".into());
+        assert_eq!(registry.quorum_of("req2".into()), Some("g".into()));
     }
 }

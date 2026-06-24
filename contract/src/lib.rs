@@ -80,6 +80,9 @@ pub struct AttestationRegistry {
     agreement: Mapping<(String, String), u32>,
     // dedup guard: signers already counted toward a given (request_id, output_hash).
     attested: Mapping<(String, String, Address), bool>,
+    // the agreeing signers per pair, indexed 1..=agreement, so the gate can re-count
+    // how many are STILL trusted at call time (a slashed signer no longer counts).
+    agree_signers: Mapping<(String, String, u32), Address>,
     // winning output hash once quorum is reached, keyed by request_id.
     quorum_output: Mapping<String, String>,
     // one-vote-per-signer-per-request guard, keyed by (request_id, signer).
@@ -151,6 +154,8 @@ impl AttestationRegistry {
             self.attested.set(&signer_key, true);
             let n = self.agreement.get(&pair).unwrap_or(0) + 1;
             self.agreement.set(&pair, n);
+            self.agree_signers
+                .set(&(request_id.clone(), output_hash.clone(), n), signer);
             n
         };
 
@@ -186,16 +191,38 @@ impl AttestationRegistry {
         self.quorum_output.get(&request_id)
     }
 
-    /// The composable verify-before-act guard: returns the lead signer if `output_hash`
-    /// is the quorum-attested result for `request_id`, otherwise reverts. Any contract can
-    /// cross-call this so the verify decision and its own action execute in one atomic VM
-    /// call — the gate cannot be skipped off-chain.
+    /// The composable verify-before-act guard. Reverts unless `output_hash` is the
+    /// quorum-attested result for `request_id` AND at least `threshold` of its agreeing
+    /// signers are STILL trusted right now — so a quorum reached by signers later slashed
+    /// no longer passes. Returns a still-trusted lead signer who attested this request.
+    /// Any contract cross-calls this so verify-and-act run in one atomic VM call.
     pub fn require_quorum(&self, request_id: String, output_hash: String) -> Address {
         match self.quorum_output.get(&request_id) {
-            Some(winner) if winner == output_hash => match self.attestations.get(&output_hash) {
-                Some(record) => record.signer,
-                None => self.env().revert(Error::NotAttested),
-            },
+            Some(winner) if winner == output_hash => {
+                let pair = (request_id.clone(), output_hash.clone());
+                let count = self.agreement.get(&pair).unwrap_or(0);
+                let threshold = self.quorum_threshold.get().unwrap_or(1);
+                let mut still_trusted = 0u32;
+                let mut lead: Option<Address> = None;
+                let mut i = 1u32;
+                while i <= count {
+                    if let Some(signer) =
+                        self.agree_signers.get(&(request_id.clone(), output_hash.clone(), i))
+                    {
+                        if self.trusted.get(&signer).unwrap_or(false) {
+                            still_trusted += 1;
+                            if lead.is_none() {
+                                lead = Some(signer);
+                            }
+                        }
+                    }
+                    i += 1;
+                }
+                match lead {
+                    Some(signer) if still_trusted >= threshold => signer,
+                    _ => self.env().revert(Error::NoQuorum),
+                }
+            }
             _ => self.env().revert(Error::NoQuorum),
         }
     }
@@ -597,5 +624,42 @@ mod tests {
             Err(Error::NoQuorum.into())
         );
         assert!(vault.try_release("req".into(), "genuine".into(), beneficiary).is_ok());
+    }
+
+    #[test]
+    fn c2_slashing_revokes_a_reached_quorum() {
+        // C2: quorum_output is write-once, but the gate must reflect LIVE trust.
+        // Two signers reach quorum, then both are slashed — require_quorum (and the
+        // vault release that composes it) must now revert, not pass forever.
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        let s3 = env.get_account(2);
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s3);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+
+        env.set_caller(env.get_account(0));
+        assert_eq!(registry.quorum_of("req".into()), Some("h".into()));
+        // gate passes while both signers are trusted, and returns a still-trusted lead
+        assert_eq!(registry.require_quorum("req".into(), "h".into()), s2);
+
+        registry.slash(s2);
+        registry.slash(s3);
+
+        assert_eq!(
+            registry.try_require_quorum("req".into(), "h".into()),
+            Err(Error::NoQuorum.into())
+        );
+        let beneficiary = env.get_account(4);
+        assert_eq!(
+            vault.try_release("req".into(), "h".into(), beneficiary),
+            Err(Error::NoQuorum.into())
+        );
     }
 }

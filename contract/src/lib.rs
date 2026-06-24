@@ -57,6 +57,7 @@ pub enum Error {
     InvalidInput = 7,
     NotAuthorized = 8,
     AlreadyReleased = 9,
+    AlreadyRefunded = 10,
 }
 
 /// Quorum-native attestation registry.
@@ -338,6 +339,8 @@ pub struct PayoutVault {
     escrow: Mapping<String, U512>,
     // beneficiary bound on-chain at deposit time (never a free-form release arg).
     beneficiary: Mapping<String, Address>,
+    // one-shot guard: escrow refunded to the payer when a request never reaches quorum.
+    refunded: Mapping<String, bool>,
 }
 
 #[odra::module]
@@ -372,6 +375,9 @@ impl PayoutVault {
         if self.released.get(&request_id).unwrap_or(false) {
             self.env().revert(Error::AlreadyReleased);
         }
+        if self.refunded.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyRefunded);
+        }
         self.released.set(&request_id, true);
         let beneficiary = self.beneficiary.get(&request_id).unwrap_or_revert(&self.env());
         let amount = self.escrow.get(&request_id).unwrap_or_default();
@@ -387,6 +393,27 @@ impl PayoutVault {
             reputation,
         });
         reputation
+    }
+
+    /// Returns the escrowed CSPR for `request_id` to the authorized payer when the request
+    /// has not been released. One-shot and mutually exclusive with release: a request is
+    /// either paid out (on quorum) or refunded (when quorum never comes) — never both.
+    pub fn refund(&mut self, request_id: String) {
+        let payer = self.authorized.get().unwrap_or_revert(&self.env());
+        if self.env().caller() != payer {
+            self.env().revert(Error::NotAuthorized);
+        }
+        if self.released.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        if self.refunded.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyRefunded);
+        }
+        self.refunded.set(&request_id, true);
+        let amount = self.escrow.get(&request_id).unwrap_or_default();
+        if amount > U512::zero() {
+            self.env().transfer_tokens(&payer, &amount);
+        }
     }
 }
 
@@ -877,5 +904,51 @@ mod tests {
             registry.try_require_quorum("req".into(), "h".into()),
             Err(Error::NoQuorum.into())
         );
+    }
+
+    #[test]
+    fn refund_returns_escrow_when_quorum_never_reached() {
+        // Fund-safety: escrow on a request that never reaches quorum is recoverable.
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let beneficiary = env.get_account(3);
+        let payer = env.get_account(0);
+        let amount = U512::from(2_000_000_000u64);
+        let payer_before = env.balance_of(&payer);
+
+        vault.with_tokens(amount).deposit("req".into(), beneficiary);
+        assert_eq!(env.balance_of(&payer), payer_before - amount);
+
+        // only one of two signers attests — never reaches quorum; release reverts
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(payer);
+        assert_eq!(vault.try_release("req".into(), "h".into()), Err(Error::NoQuorum.into()));
+
+        // payer reclaims the stranded escrow, and cannot refund twice
+        vault.refund("req".into());
+        assert_eq!(env.balance_of(&payer), payer_before);
+        assert_eq!(vault.try_refund("req".into()), Err(Error::AlreadyRefunded.into()));
+    }
+
+    #[test]
+    fn released_request_cannot_be_refunded() {
+        // Mutual exclusion: a paid-out request can never be refunded (no double spend).
+        let env = odra_test::env();
+        let (mut registry, mut vault) = deploy_pair(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let beneficiary = env.get_account(3);
+        vault.with_tokens(U512::from(1_000_000_000u64)).deposit("req".into(), beneficiary);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+
+        env.set_caller(env.get_account(0));
+        assert!(vault.try_release("req".into(), "h".into()).is_ok());
+        assert_eq!(vault.try_refund("req".into()), Err(Error::AlreadyReleased.into()));
     }
 }

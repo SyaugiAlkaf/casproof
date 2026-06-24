@@ -4,7 +4,7 @@ import PoisonDemo from "@/components/PoisonDemo";
 import QuorumContrast from "@/components/QuorumContrast";
 import HowItWorks from "@/components/HowItWorks";
 import CasperStack from "@/components/CasperStack";
-import FirewallHero from "@/components/FirewallHero";
+import AsciiHero from "@/components/AsciiHero";
 import Reveal from "@/components/Reveal";
 
 const REPO_URL = "https://github.com/SyaugiAlkaf/casproof";
@@ -22,25 +22,10 @@ export default function Page() {
       <Header />
 
       <main id="main" className="relative z-10 mx-auto max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
-        <section aria-labelledby="hero-title" className="mb-14 max-w-3xl">
-          <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-mint/20 bg-mint/[0.05] px-3 py-1.5 text-xs font-medium text-mint-soft">
-            <span className="relative flex h-1.5 w-1.5">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-75" />
-              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
-            </span>
-            Casper testnet · verify-before-act for AI agents
-          </div>
-          <h1
-            id="hero-title"
-            className="text-balance text-[2.5rem] font-semibold leading-[1.05] tracking-tight text-slate-50 sm:text-[3.25rem]"
-          >
-            The unskippable on-chain{" "}
-            <span className="bg-gradient-to-r from-mint-soft to-mint bg-clip-text text-transparent">
-              action firewall
-            </span>{" "}
-            for AI agents.
-          </h1>
-          <p className="mt-6 max-w-2xl text-pretty text-base leading-relaxed text-slate-300 sm:text-lg">
+        <AsciiHero />
+
+        <div className="mb-14 max-w-3xl">
+          <p className="max-w-2xl text-pretty text-base leading-relaxed text-slate-300 sm:text-lg">
             Casproof settles the verify decision and the value-bearing action in one atomic Casper VM call — so an
             off-chain agent cannot skip the check. Others score agent trust off-chain; Casproof{" "}
             <span className="font-medium text-slate-100">enforces it on-chain</span>, and the metered verify read is
@@ -56,9 +41,7 @@ export default function Page() {
             <HeroChip>Pluggable attestation policy</HeroChip>
             <HeroChip>RWA / DeFi payouts</HeroChip>
           </ul>
-        </section>
-
-        <FirewallHeroPanel />
+        </div>
 
         <div className="space-y-6 scroll-mt-24" id="verify">
           <HeroVerify />
@@ -82,28 +65,6 @@ export default function Page() {
       <Reveal>
         <Footer />
       </Reveal>
-    </div>
-  );
-}
-
-function FirewallHeroPanel() {
-  return (
-    <div className="mb-14 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-ink-850/80 to-ink-900/80 shadow-card">
-      <div className="relative h-[200px] w-full sm:h-[240px]">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_120%_at_60%_50%,rgba(45,212,191,0.08)_0%,transparent_60%)]" />
-        <FirewallHero />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-ink-900/80 to-transparent" />
-      </div>
-      <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-5 py-2.5 sm:px-6">
-        <span className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
-            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
-          </span>
-          verify-before-act, live
-        </span>
-        <span className="font-mono text-[11px] text-slate-600">genuine → PAY · poisoned → REVERT</span>
-      </div>
     </div>
   );
 }

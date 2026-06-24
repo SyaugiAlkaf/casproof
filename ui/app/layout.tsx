@@ -1,19 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, JetBrains_Mono } from "next/font/google";
 import StyledRegistry from "@/components/StyledRegistry";
 import "./globals.css";
-
-const sans = Inter({
-  subsets: ["latin"],
-  variable: "--font-sans",
-  display: "swap"
-});
-
-const mono = JetBrains_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-  display: "swap"
-});
 
 export const metadata: Metadata = {
   title: "Casproof — the unskippable on-chain action firewall for AI agents",
@@ -28,7 +15,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    <html lang="en">
       <body className="min-h-screen bg-ink-950 font-sans text-slate-200 antialiased">
         <StyledRegistry>{children}</StyledRegistry>
       </body>

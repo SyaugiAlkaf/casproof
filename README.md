@@ -4,7 +4,7 @@
 
 **An unskippable on-chain action firewall for AI agents — verify-before-act, enforced in the Casper VM.**
 
-An AI agent produces a result — a price feed, a risk score, an RWA valuation. Before any value-bearing action fires, a consuming contract must prove that result passed attestation. Not suggested by off-chain logic. Not checked and then acted on in two separate calls. Proved and acted on in **one atomic Casper VM execution**, so there is no gap an attacker or a misconfigured agent can slip through.
+An AI agent produces a result — a price feed, a risk score, an RWA valuation. Before any value-bearing action fires, a consuming contract must prove that result passed attestation. Not suggested by off-chain logic. Not checked and then acted on in two separate calls. Proved and acted on in **one atomic Casper VM execution**, so there is no gap an attacker or a misconfigured agent can slip through. This firewall guarantee applies when a consuming contract cross-calls `require_quorum` inside the Casper WASM VM; off-chain agents that read quorum state and act in a separate call are not covered by this guarantee.
 
 That is the gap Casproof closes. `registry.require_quorum(request_id, output_hash)` is a composable guard: any contract cross-calls it, and the verify decision plus the caller's own action run atomically. If the output did not reach the attestation threshold, the VM reverts before a single mote moves. No off-chain agent can override it — the enforcement is in the WASM runtime, not in client configuration.
 
@@ -53,13 +53,13 @@ The second problem is the audit trail. Regulated financial workflows — AI-assi
 
 The key property: any contract can cross-call `require_quorum` as the first step of an action entrypoint. In Casper's WASM VM, that cross-call and the rest of the entrypoint run in one atomic execution. If the guard reverts, the entire transaction reverts. There is no window between "check passed" and "action fired" for anything to change.
 
-`PayoutVault.release(request_id, output_hash, beneficiary)` is the reference consumer. It calls `require_quorum`, then emits `PayoutAuthorized` with the lead signer's address and reputation score. If the output is poisoned or under-quorum, `release` reverts on-chain — a failed deploy on the explorer, auditable and permanent.
+`PayoutVault` is the reference consumer. The payer escrows CSPR with `deposit(request_id, beneficiary)` — binding the beneficiary on-chain — then `release(request_id, output_hash)` calls `require_quorum` and, only on a verified output, transfers the escrowed CSPR to the bound beneficiary and emits `PayoutAuthorized` with the lead signer's reputation. If the output is poisoned or under-quorum, `release` reverts on-chain before a single mote moves — a failed deploy on the explorer, auditable and permanent. Escrow on a request that never reaches quorum is recoverable by the payer with `refund(request_id)`.
 
 ### Quorum as one pluggable attestation policy
 
 Quorum is not the product. It is the first attestation policy behind the gate.
 
-K independent trusted signers each call `attest(request_id, output_hash, model_id, prompt_hash)` on the registry. The registry counts distinct-signer agreement per `(request_id, output_hash)` pair. When k distinct trusted signers have attested the byte-identical hash for the same request, the request becomes quorum-attested and `QuorumReached` fires. The winning hash is stored in `quorum_output[request_id]` — the value `require_quorum` reads.
+K distinct trusted signers each call `attest(request_id, output_hash, model_id, prompt_hash)` on the registry. The registry counts distinct-signer agreement per `(request_id, output_hash)` pair. When k separate trusted signers have attested the byte-identical hash for the same request, the request becomes quorum-attested and `QuorumReached` fires. The winning hash is stored in `quorum_output[request_id]` — the value `require_quorum` reads.
 
 The check is deterministic: pure hash equality, not an opinion poll. A swapped or tampered output produces a different hash, increments a separate counter, and cannot contribute to the agreeing set.
 
@@ -67,12 +67,13 @@ Future proof sources — TEE remote-attestation receipts, zkML proofs, optimisti
 
 ### Honest trust model
 
-Today the trusted signer set is owner-curated. That is the right tradeoff for a buildathon deployment, but it deserves an honest accounting of what it means.
+Today the trusted signer set is owner-curated. The **owner** is a trusted setup role: it calls `set_quorum`, `set_trusted`, and `slash`, and is the single-point-of-failure until removed. The intended lifecycle is: deploy → configure quorum and the trusted panel → call `renounce_ownership()` to freeze the configuration and eliminate the owner role; `transfer_ownership(new_owner)` is also available for a handoff before renouncing. That is the right tradeoff for a buildathon deployment, but it deserves an honest accounting of what it means.
 
-A curated signer could in principle attest any hash, including one they did not genuinely compute. Two mitigations are live now:
+A curated signer could in principle attest any hash, including one they did not genuinely compute. Several mitigations are live now:
 
-- **Slashing.** `registry.slash(signer)` (owner-only) revokes trust and reduces the signer's reputation score (`attestation_count - slashes`). Reputation falls when you lie, so there is a cost — skin in the game for the curated set.
-- **Quorum size.** Compromising k signers independently is harder than compromising one. The live demo runs k=2 across two independent model keys; the value is configurable via `set_quorum`.
+- **Slashing.** `registry.slash(signer)` (owner-only) revokes trust and reduces the signer's reputation score (`attestation_count - slashes`). Reputation falls when you lie, so there is a cost — skin in the game for the curated set. Slashing is sticky: a slashed signer no longer counts toward quorum even if re-trusted, until explicitly re-onboarded.
+- **Quorum size.** Compromising k signers independently is harder than compromising one. The live demo runs k=2 across two separate model keys; the value is configurable via `set_quorum`. In the current demo both keys are operated by the same entity — true independence requires separately-operated and separately-staked signers, which is the economic-security roadmap item.
+- **Escrow refund.** `refund(request_id)` lets the depositor reclaim escrowed CSPR for a request that never reaches quorum, so stuck funds are recoverable.
 
 The roadmap mitigation is binding attestations to proof-of-computation receipts — TEE remote-attestation or zkML — so a signer cannot attest a hash without evidence the computation actually ran. That turns the curated set into a verified-computation set. Until then, the system is "trust this panel plus slashing" not "trust nobody."
 
@@ -98,14 +99,14 @@ The lead signer returned by the gate is bound to a still-trusted signer who atte
 
 The `/verify` endpoint is paywalled with [x402](https://x402.org): an unpaid request gets `402 Payment Required` with Casper payment requirements (`casper:casper-test`); the client attaches an `X-PAYMENT` header; the request is settled through the hosted Casper facilitator (`x402-facilitator.cspr.cloud`); only then does the endpoint perform the real on-chain read. An oracle operator earns per verified read while agents pay only for what they consume.
 
-The server-side paywall and facilitator settlement are real. The reference client (`payVerify.ts`) constructs the payment payload but does not yet sign it with the Casper x402 scheme (`@casper-ecosystem/casper-eip-712`), so the end-to-end handshake runs in `X402_MODE=sim` out of the box; pointing it at the live facilitator additionally requires the Casper payment signer and a CSPR.cloud key.
+> **Known limitation:** the server-side paywall and facilitator settlement are real. The reference client (`payVerify.ts`) constructs the payment payload but does not yet sign it with the Casper x402 scheme (`@casper-ecosystem/casper-eip-712`), so the end-to-end handshake runs in `X402_MODE=sim` out of the box. Fully-live end-to-end x402 — with the Casper payment signer and a CSPR.cloud key wired in — is a roadmap item.
 
 ### Agent-discoverable (MCP)
 
 Casproof ships an [MCP](https://modelcontextprotocol.io) server so any AI agent — Claude Desktop, an autonomous agent, anything that speaks the Model Context Protocol — can discover and call it directly. Three tools:
 
 - `casproof_compute_hash` — fingerprint an output (no chain access)
-- `casproof_verify_output` — check an output on-chain and get back a `PROCEED` / `BLOCK` decision
+- `casproof_verify_output` — a convenience read of the on-chain quorum verdict, returning a `PROCEED` / `BLOCK` advisory; enforcement requires composing `require_quorum` in-VM and this advisory read does not reflect live slash state at call time
 - `casproof_attest` — publish an attestation on-chain (real testnet transaction)
 
 This is exactly the pattern Casper's AI toolkit is built around — *agents discover capabilities via MCP, pay via x402, settle on-chain* — and it makes Casproof both a **consumer** of agentic infrastructure (it attests its own AI outputs) and a **provider** of it (other agents call it to verify-before-act).
@@ -114,7 +115,7 @@ This is exactly the pattern Casper's AI toolkit is built around — *agents disc
 
 | Path | What it is |
 |---|---|
-| `contract/` | Two [Odra](https://odra.dev) (Rust → WASM) contracts: `AttestationRegistry` (quorum-native, trusted-signer-gated `attest`, composable `require_quorum` guard, slashable `reputation`) and `PayoutVault` — a consumer that composes `require_quorum` so verify-and-act are one atomic VM call. 19 OdraVM unit tests. |
+| `contract/` | Two [Odra](https://odra.dev) (Rust → WASM) contracts: `AttestationRegistry` (quorum-native, trusted-signer-gated `attest`, composable `require_quorum` guard, slashable `reputation`) and `PayoutVault` — a consumer that composes `require_quorum` so verify-and-act are one atomic VM call. 26 OdraVM tests (19 functional + 7 adversarial). |
 | `agents/` | TypeScript multi-model producer panel, autonomous consumer agent, on-chain read library, x402 verify server, MCP server, slash script, and keygen/deploy/resolve/setup scripts (`casper-js-sdk` v5, Anthropic API). |
 | `ui/` | Next.js dashboard (CSPR.click wallet connect) — verify an output, show the attestation badge and explorer link, and the live poison→block contrast screen. |
 
@@ -132,7 +133,7 @@ This is exactly the pattern Casper's AI toolkit is built around — *agents disc
 
 ```bash
 cd contract
-make test                # OdraVM unit tests (19 tests)
+make test                # OdraVM unit tests (26 tests: 19 functional + 7 adversarial)
 make build               # build + wasm-opt -Oz → wasm/AttestationRegistry.wasm (~192 KB)
 ```
 

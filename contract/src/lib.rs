@@ -76,6 +76,9 @@ pub enum Error {
 #[odra::module(events = [OutputAttested, QuorumReached, SignerSlashed])]
 pub struct AttestationRegistry {
     owner: Var<Address>,
+    // once true, ownership is renounced — every owner-only entrypoint reverts permanently,
+    // freezing the configured trusted panel and removing the owner single-point-of-failure.
+    renounced: Var<bool>,
     quorum_threshold: Var<u32>,
     trusted: Mapping<Address, bool>,
     attestation_count: Mapping<Address, u64>,
@@ -297,7 +300,30 @@ impl AttestationRegistry {
         self.quorum_threshold.set(threshold);
     }
 
+    /// Hand the owner role to `new_owner`. Owner-only; lets a deployer hand off custody
+    /// of the trust-policy key before renouncing.
+    pub fn transfer_ownership(&mut self, new_owner: Address) {
+        self.assert_owner();
+        self.owner.set(new_owner);
+    }
+
+    /// Permanently give up the owner role. After this, set_quorum/set_trusted/slash and
+    /// ownership changes all revert — freezing the trusted panel as configured. The intended
+    /// end state once the quorum and signer set are final: it removes the owner SPOF, so no
+    /// single key can later re-curate the panel or forge a quorum.
+    pub fn renounce_ownership(&mut self) {
+        self.assert_owner();
+        self.renounced.set(true);
+    }
+
+    pub fn is_renounced(&self) -> bool {
+        self.renounced.get().unwrap_or(false)
+    }
+
     fn assert_owner(&self) {
+        if self.renounced.get().unwrap_or(false) {
+            self.env().revert(Error::NotOwner);
+        }
         if self.env().caller() != self.owner.get().unwrap_or_revert(&self.env()) {
             self.env().revert(Error::NotOwner);
         }
@@ -950,5 +976,37 @@ mod tests {
         env.set_caller(env.get_account(0));
         assert!(vault.try_release("req".into(), "h".into()).is_ok());
         assert_eq!(vault.try_refund("req".into()), Err(Error::AlreadyReleased.into()));
+    }
+
+    #[test]
+    fn ownership_transfer_and_renounce() {
+        // Owner SPOF teeth: ownership can be handed off, and renounced to freeze the panel.
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        let new_owner = env.get_account(1);
+
+        // a non-owner cannot transfer ownership
+        env.set_caller(new_owner);
+        assert_eq!(registry.try_transfer_ownership(new_owner), Err(Error::NotOwner.into()));
+
+        // owner hands off; the old owner loses powers, the new owner gains them
+        env.set_caller(env.get_account(0));
+        registry.transfer_ownership(new_owner);
+        assert_eq!(registry.try_set_quorum(3), Err(Error::NotOwner.into()));
+        env.set_caller(new_owner);
+        registry.set_quorum(3);
+        assert_eq!(registry.threshold(), 3);
+
+        // renounce freezes the configuration — no one can change it afterward
+        assert!(!registry.is_renounced());
+        registry.renounce_ownership();
+        assert!(registry.is_renounced());
+        assert_eq!(registry.try_set_quorum(2), Err(Error::NotOwner.into()));
+        assert_eq!(registry.try_set_trusted(new_owner, false), Err(Error::NotOwner.into()));
+        assert_eq!(registry.try_slash(new_owner), Err(Error::NotOwner.into()));
+        assert_eq!(
+            registry.try_transfer_ownership(env.get_account(0)),
+            Err(Error::NotOwner.into())
+        );
     }
 }

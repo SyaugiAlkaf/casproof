@@ -8,12 +8,15 @@ export interface AgentOutput {
   payload: unknown;
 }
 
-export function canonical(value: unknown): string {
+const MAX_DEPTH = 32;
+
+export function canonical(value: unknown, depth = 0): string {
+  if (depth > MAX_DEPTH) throw new Error("payload nesting too deep");
   if (value === null || typeof value !== "object") return JSON.stringify(value);
-  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (Array.isArray(value)) return `[${value.map((v) => canonical(v, depth + 1)).join(",")}]`;
   const keys = Object.keys(value as Record<string, unknown>).sort();
   return `{${keys
-    .map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k])}`)
+    .map((k) => `${JSON.stringify(k)}:${canonical((value as Record<string, unknown>)[k], depth + 1)}`)
     .join(",")}}`;
 }
 

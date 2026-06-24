@@ -15,6 +15,7 @@ export interface QuorumInfo {
 export interface VerifyResult {
   hash: string;
   attested: boolean;
+  chainError?: boolean;
   signer?: string;
   trusted?: boolean;
   source?: "chain" | "cspr.cloud";

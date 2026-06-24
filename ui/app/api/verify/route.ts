@@ -17,6 +17,31 @@ const DEFAULT_REQUEST_ID = process.env.REQUEST_ID ?? process.env.NEXT_PUBLIC_REQ
 // display denominator (the PAY/BLOCK decision uses quorum_output, not this number).
 const QUORUM_THRESHOLD = Number(process.env.QUORUM_THRESHOLD ?? process.env.NEXT_PUBLIC_QUORUM_THRESHOLD ?? 0) || 0;
 
+const MAX_BODY_BYTES = 32 * 1024;
+
+// Best-effort fixed-window rate limit. In-memory, single-instance only — resets on redeploy and
+// does not coordinate across serverless instances. A real deployment fronts this with an edge limiter.
+const RATE_WINDOW_MS = 10_000;
+const RATE_MAX = 20;
+const rateBuckets = new Map<string, { count: number; reset: number }>();
+
+function rateLimited(ip: string): boolean {
+  const now = Date.now();
+  const b = rateBuckets.get(ip);
+  if (!b || now > b.reset) {
+    rateBuckets.set(ip, { count: 1, reset: now + RATE_WINDOW_MS });
+    return false;
+  }
+  b.count += 1;
+  return b.count > RATE_MAX;
+}
+
+function clientIp(req: Request): string {
+  const fwd = req.headers.get("x-forwarded-for");
+  if (fwd) return fwd.split(",")[0].trim();
+  return req.headers.get("x-real-ip")?.trim() || "unknown";
+}
+
 interface VerifyBody {
   feed?: { modelId: string; prompt: string; payload: unknown };
   hash?: string;
@@ -34,6 +59,7 @@ interface QuorumInfo {
 interface VerifyResponse {
   hash: string;
   attested: boolean;
+  chainError?: boolean;
   signer?: string;
   trusted?: boolean;
   source?: "chain" | "cspr.cloud";
@@ -44,14 +70,33 @@ interface VerifyResponse {
 }
 
 export async function POST(req: Request) {
+  if (rateLimited(clientIp(req))) {
+    return NextResponse.json({ error: "rate limit exceeded" }, { status: 429 });
+  }
+
+  const declaredLen = Number(req.headers.get("content-length") ?? 0);
+  if (declaredLen > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "request body too large" }, { status: 413 });
+  }
+
+  const raw = await req.text();
+  if (raw.length > MAX_BODY_BYTES) {
+    return NextResponse.json({ error: "request body too large" }, { status: 413 });
+  }
+
   let body: VerifyBody;
   try {
-    body = (await req.json()) as VerifyBody;
+    body = JSON.parse(raw) as VerifyBody;
   } catch {
     return NextResponse.json({ error: "body must be JSON" }, { status: 400 });
   }
 
-  const hash = resolveHash(body);
+  let hash: string | null;
+  try {
+    hash = resolveHash(body);
+  } catch {
+    return NextResponse.json({ error: "payload could not be hashed" }, { status: 400 });
+  }
   if (!hash) {
     return NextResponse.json(
       { error: "provide either { feed: {modelId, prompt, payload} } or { hash: '<64hex>' }" },
@@ -84,12 +129,15 @@ export async function POST(req: Request) {
     }
     return NextResponse.json(res);
   } catch (e) {
+    // Keep node URL + contract hash server-side; the client gets a generic message.
+    console.error("[verify] chain read failed:", e);
     const res: VerifyResponse = {
       hash,
       attested: false,
-      error: e instanceof Error ? e.message : "verification read failed"
+      chainError: true,
+      error: "verification read failed"
     };
-    return NextResponse.json(res);
+    return NextResponse.json(res, { status: 502 });
   }
 }
 

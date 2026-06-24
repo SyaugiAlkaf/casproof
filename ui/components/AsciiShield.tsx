@@ -7,67 +7,122 @@ const FONT_PX = 12;
 const CELL_W = FONT_PX * 0.62;
 const CELL_H = FONT_PX * 1.0;
 const FRAME_MS = 1000 / 35;
-const TARGET_COLS = 78;
+const TARGET_COLS = 150;
 
-const SPHERE_LAT = 46;
-const SPHERE_LON = 90;
-const RING_SEG = 220;
-const RING_TUBE = 16;
-const RING_R = 1.46;
-const RING_TUBE_R = 0.13;
+const GRID_U = 132;
+const GRID_V = 168;
+const SHIELD_HALF_W = 0.86;
+const SHIELD_TOP_Y = 1.16;
+const SHIELD_BOT_Y = -1.28;
+const SHIELD_CY = (SHIELD_TOP_Y + SHIELD_BOT_Y) / 2;
+const SHIELD_HY = (SHIELD_TOP_Y - SHIELD_BOT_Y) / 2;
 
-const LIGHT = norm(0.55, 0.62, 0.58);
+const LIGHT = norm(0.5, 0.66, 0.56);
 
 function norm(x: number, y: number, z: number): [number, number, number] {
   const l = Math.hypot(x, y, z) || 1;
   return [x / l, y / l, z / l];
 }
 
+function smoothstep(a: number, b: number, x: number): number {
+  const t = Math.max(0, Math.min(1, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+}
+
 type Vec3 = [number, number, number];
+type Vert = { p: Vec3; n: Vec3 };
 
-function buildSphere(): { p: Vec3; n: Vec3 }[] {
-  const out: { p: Vec3; n: Vec3 }[] = [];
-  for (let i = 0; i <= SPHERE_LAT; i++) {
-    const theta = (i / SPHERE_LAT) * Math.PI;
-    const st = Math.sin(theta);
-    const ct = Math.cos(theta);
-    for (let j = 0; j < SPHERE_LON; j++) {
-      const phi = (j / SPHERE_LON) * 2 * Math.PI;
-      const x = st * Math.cos(phi);
-      const y = ct;
-      const z = st * Math.sin(phi);
-      out.push({ p: [x, y, z], n: [x, y, z] });
+function halfWidth(t: number): number {
+  if (t <= 0.16) {
+    return SHIELD_HALF_W * (0.92 + 0.08 * smoothstep(0, 0.16, t));
+  }
+  if (t <= 0.46) {
+    return SHIELD_HALF_W;
+  }
+  const k = (t - 0.46) / 0.54;
+  return SHIELD_HALF_W * Math.sqrt(Math.max(0, 1 - k * k));
+}
+
+function height(nx: number, ny: number, edge: number): number {
+  const dome = (1 - nx * nx * 0.82) * (1 - ny * ny * 0.3);
+  let z = 0.52 * Math.max(0, dome);
+
+  const rim = smoothstep(0.0, 0.15, edge) * (1 - smoothstep(0.15, 0.32, edge));
+  z += 0.28 * rim;
+
+  const kx = nx;
+  const ky = ny - 0.16;
+  const ringR = Math.hypot(kx, ky * 1.05);
+  const ring = (1 - smoothstep(0.18, 0.25, Math.abs(ringR - 0.17))) * 0.5;
+  const hole = (1 - smoothstep(0.0, 0.1, ringR)) * 0.6;
+  const slot =
+    Math.abs(kx) < 0.05 && ky < -0.06 && ky > -0.4
+      ? (1 - smoothstep(0.0, 0.05, Math.abs(kx))) * 0.5
+      : 0;
+  z -= 0.09 * Math.max(hole, slot);
+  z += 0.05 * ring;
+
+  return z * smoothstep(0.0, 0.06, edge);
+}
+
+function buildShield(): Vert[] {
+  const cols = GRID_U + 1;
+  const rows = GRID_V + 1;
+  const zGrid = new Float32Array(cols * rows);
+  const inside = new Uint8Array(cols * rows);
+  const px = new Float32Array(cols * rows);
+  const py = new Float32Array(cols * rows);
+
+  for (let j = 0; j <= GRID_V; j++) {
+    const t = j / GRID_V;
+    const y = SHIELD_TOP_Y + t * (SHIELD_BOT_Y - SHIELD_TOP_Y);
+    const hw = halfWidth(t);
+    for (let i = 0; i <= GRID_U; i++) {
+      const u = (i / GRID_U) * 2 - 1;
+      const x = u * SHIELD_HALF_W;
+      const cell = j * cols + i;
+      px[cell] = x;
+      py[cell] = y;
+      if (hw <= 1e-4 || Math.abs(x) > hw) {
+        inside[cell] = 0;
+        zGrid[cell] = 0;
+        continue;
+      }
+      const nx = x / SHIELD_HALF_W;
+      const ny = (y - SHIELD_CY) / SHIELD_HY;
+      const edgeX = 1 - Math.abs(x) / hw;
+      const edgeY = Math.min(smoothstep(0, 0.1, t), 1 - smoothstep(0.9, 1, t));
+      const edge = Math.min(edgeX, edgeY * 1.5);
+      inside[cell] = 1;
+      zGrid[cell] = height(nx, ny, edge);
+    }
+  }
+
+  const out: Vert[] = [];
+  const dx = (2 * SHIELD_HALF_W) / GRID_U;
+  const dy = (SHIELD_TOP_Y - SHIELD_BOT_Y) / GRID_V;
+  for (let j = 0; j <= GRID_V; j++) {
+    for (let i = 0; i <= GRID_U; i++) {
+      const cell = j * cols + i;
+      if (!inside[cell]) continue;
+      const il = i > 0 && inside[cell - 1] ? cell - 1 : cell;
+      const ir = i < GRID_U && inside[cell + 1] ? cell + 1 : cell;
+      const jt = j > 0 && inside[cell - cols] ? cell - cols : cell;
+      const jb = j < GRID_V && inside[cell + cols] ? cell + cols : cell;
+      const spanX = il === ir ? 1 : il === cell || ir === cell ? 1 : 2;
+      const spanY = jt === jb ? 1 : jt === cell || jb === cell ? 1 : 2;
+      const dzdx = (zGrid[ir] - zGrid[il]) / (spanX * dx);
+      const dzdy = (zGrid[jt] - zGrid[jb]) / (spanY * dy);
+      const n = norm(-dzdx, dzdy, 1);
+      out.push({ p: [px[cell], py[cell], zGrid[cell]], n });
     }
   }
   return out;
 }
 
-function buildRing(): { p: Vec3; n: Vec3 }[] {
-  const out: { p: Vec3; n: Vec3 }[] = [];
-  for (let i = 0; i < RING_SEG; i++) {
-    const u = (i / RING_SEG) * 2 * Math.PI;
-    const cu = Math.cos(u);
-    const su = Math.sin(u);
-    for (let k = 0; k < RING_TUBE; k++) {
-      const v = (k / RING_TUBE) * 2 * Math.PI;
-      const cv = Math.cos(v);
-      const sv = Math.sin(v);
-      const x = (RING_R + RING_TUBE_R * cv) * cu;
-      const y = RING_TUBE_R * sv;
-      const z = (RING_R + RING_TUBE_R * cv) * su;
-      const nx = cv * cu;
-      const ny = sv;
-      const nz = cv * su;
-      out.push({ p: [x, y, z], n: norm(nx, ny, nz) });
-    }
-  }
-  return out;
-}
+const SHIELD = buildShield();
 
-const SPHERE = buildSphere();
-const RING = buildRing();
-
-export default function AsciiOrb() {
+export default function AsciiShield() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -88,15 +143,15 @@ export default function AsciiOrb() {
 
     let lumBuf = new Float32Array(0);
     let depthBuf = new Float32Array(0);
-    let kindBuf = new Uint8Array(0);
+    let onBuf = new Uint8Array(0);
 
     let raf = 0;
     let last = 0;
     let running = false;
     let visible = true;
 
-    let rotX = -0.45;
-    let rotY = 0.6;
+    let rotX = 0;
+    let rotY = 0;
     let mx = 0;
     let my = 0;
     let tmx = 0;
@@ -117,66 +172,62 @@ export default function AsciiOrb() {
       ctx.textBaseline = "middle";
       ctx.textAlign = "center";
 
-      cols = Math.max(28, Math.min(TARGET_COLS, Math.floor(width / CELL_W)));
-      rows = Math.max(16, Math.floor(height / CELL_H));
+      cols = Math.max(40, Math.min(TARGET_COLS, Math.floor(width / CELL_W)));
+      rows = Math.max(28, Math.floor(height / CELL_H));
       cx = cols / 2;
       cy = rows / 2;
-      scale = Math.min(cols, rows * 2.0) * 0.3;
+      scale = Math.min(cols / 2.2, rows / 2.7);
 
       lumBuf = new Float32Array(cols * rows);
       depthBuf = new Float32Array(cols * rows);
-      kindBuf = new Uint8Array(cols * rows);
+      onBuf = new Uint8Array(cols * rows);
     };
 
     const project = () => {
       lumBuf.fill(0);
       depthBuf.fill(-Infinity);
-      kindBuf.fill(0);
+      onBuf.fill(0);
 
       const sX = Math.sin(rotX);
       const cX = Math.cos(rotX);
       const sY = Math.sin(rotY);
       const cY = Math.cos(rotY);
 
-      const splat = (pts: { p: Vec3; n: Vec3 }[], kind: number, ambient: number) => {
-        for (let idx = 0; idx < pts.length; idx++) {
-          const px = pts[idx].p[0];
-          const py = pts[idx].p[1];
-          const pz = pts[idx].p[2];
-          const nx0 = pts[idx].n[0];
-          const ny0 = pts[idx].n[1];
-          const nz0 = pts[idx].n[2];
+      for (let idx = 0; idx < SHIELD.length; idx++) {
+        const v = SHIELD[idx];
+        const px = v.p[0];
+        const py = v.p[1] - SHIELD_CY;
+        const pz = v.p[2];
+        const nx0 = v.n[0];
+        const ny0 = v.n[1];
+        const nz0 = v.n[2];
 
-          const y1 = py * cX - pz * sX;
-          const z1 = py * sX + pz * cX;
-          const x2 = px * cY + z1 * sY;
-          const z2 = -px * sY + z1 * cY;
+        const y1 = py * cX - pz * sX;
+        const z1 = py * sX + pz * cX;
+        const x2 = px * cY + z1 * sY;
+        const z2 = -px * sY + z1 * cY;
 
-          const ny1 = ny0 * cX - nz0 * sX;
-          const nz1 = ny0 * sX + nz0 * cX;
-          const nx2 = nx0 * cY + nz1 * sY;
-          const nz2 = -nx0 * sY + nz1 * cY;
+        const ny1 = ny0 * cX - nz0 * sX;
+        const nz1 = ny0 * sX + nz0 * cX;
+        const nx2 = nx0 * cY + nz1 * sY;
+        const nz2 = -nx0 * sY + nz1 * cY;
 
-          const col = Math.round(cx + x2 * scale);
-          const row = Math.round(cy - y1 * (scale * 0.5));
-          if (col < 0 || col >= cols || row < 0 || row >= rows) continue;
+        const col = Math.round(cx + x2 * scale);
+        const row = Math.round(cy - y1 * scale);
+        if (col < 0 || col >= cols || row < 0 || row >= rows) continue;
 
-          const cell = row * cols + col;
-          if (z2 <= depthBuf[cell]) continue;
+        const cell = row * cols + col;
+        if (z2 <= depthBuf[cell]) continue;
 
-          let l = nx2 * LIGHT[0] + ny1 * LIGHT[1] + nz2 * LIGHT[2];
-          l = ambient + Math.max(0, l) * (1 - ambient);
-          const rim = 1 - Math.min(1, Math.abs(nz2));
-          l = Math.min(1, l + rim * 0.18);
+        let l = nx2 * LIGHT[0] + ny1 * LIGHT[1] + nz2 * LIGHT[2];
+        l = 0.1 + Math.max(0, l) * 0.9;
+        const rim = 1 - Math.min(1, Math.abs(nz2));
+        l = Math.min(1, l + rim * rim * 0.22);
 
-          depthBuf[cell] = z2;
-          lumBuf[cell] = l;
-          kindBuf[cell] = kind;
-        }
-      };
-
-      splat(RING, 2, 0.16);
-      splat(SPHERE, 1, 0.08);
+        depthBuf[cell] = z2;
+        lumBuf[cell] = l;
+        onBuf[cell] = 1;
+      }
     };
 
     const draw = () => {
@@ -191,8 +242,7 @@ export default function AsciiOrb() {
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const cell = r * cols + c;
-          const kind = kindBuf[cell];
-          if (kind === 0) continue;
+          if (!onBuf[cell]) continue;
           const l = lumBuf[cell];
           if (l <= 0.001) continue;
 
@@ -205,25 +255,22 @@ export default function AsciiOrb() {
 
           let color: string;
           let glow = 0;
-          if (kind === 2) {
-            color = l > 0.7 ? "#5eead4" : l > 0.4 ? "#34d399" : "#0f766e";
-            glow = l > 0.78 ? 8 : 0;
-          } else if (l > 0.82) {
+          if (l > 0.84) {
             color = "#eafffb";
             glow = 9;
-          } else if (l > 0.6) {
+          } else if (l > 0.62) {
             color = "#5eead4";
-            glow = 4;
-          } else if (l > 0.34) {
+            glow = 5;
+          } else if (l > 0.4) {
             color = "#34d399";
-          } else if (l > 0.16) {
+          } else if (l > 0.2) {
             color = "#2f7d6b";
           } else {
-            color = "#27314a";
+            color = "#243046";
           }
 
           if (glow > 0) {
-            ctx.shadowColor = kind === 2 ? "rgba(94,234,212,0.55)" : "rgba(52,211,153,0.6)";
+            ctx.shadowColor = "rgba(52,211,153,0.55)";
             ctx.shadowBlur = glow;
           }
           ctx.fillStyle = color;
@@ -234,6 +281,8 @@ export default function AsciiOrb() {
     };
 
     const renderOnce = () => {
+      rotX = -0.12;
+      rotY = -0.2;
       project();
       draw();
     };
@@ -250,8 +299,8 @@ export default function AsciiOrb() {
       mx += (tmx - mx) * Math.min(1, 0.06 * dt);
       my += (tmy - my) * Math.min(1, 0.06 * dt);
 
-      rotY += (0.0125 + mx * 0.02) * dt;
-      rotX = -0.45 + Math.sin(t * 0.35) * 0.12 + my * 0.5;
+      rotY = Math.sin(t * 0.28) * 0.22 + mx * 0.5;
+      rotX = -0.1 + Math.sin(t * 0.34) * 0.08 + my * 0.32;
 
       project();
       draw();
@@ -304,7 +353,7 @@ export default function AsciiOrb() {
         if (visible) start();
         else stop();
       },
-      { threshold: 0.05 }
+      { threshold: 0.02 }
     );
 
     if (reduce) {

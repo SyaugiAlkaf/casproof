@@ -42,38 +42,65 @@ export default function QuorumContrast() {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-900/60 p-6 backdrop-blur-sm sm:p-8">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-mint/40 to-transparent" />
+    <div
+      className="relative overflow-hidden rounded-3xl p-6 backdrop-blur-sm sm:p-8"
+      style={{ background: "var(--cp-surface)", border: "1px solid var(--cp-border)" }}
+    >
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--cp-teal)] to-transparent opacity-40" />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="mb-2 flex flex-wrap items-center gap-2">
             <Pill tone="neutral">action firewall · Casper VM</Pill>
-            <Pill tone={liveQuorumConfigured ? "good" : "muted"}>
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-medium tracking-wide"
+              style={{
+                border: "1px solid var(--cp-border-2)",
+                color: liveQuorumConfigured ? "var(--cp-teal)" : "var(--cp-text-2)",
+                background: liveQuorumConfigured ? "rgba(62,207,178,0.08)" : "rgba(255,255,255,0.02)"
+              }}
+            >
               <span
-                className={`h-1.5 w-1.5 rounded-full ${liveQuorumConfigured ? "bg-mint" : "bg-signal-amber"}`}
+                className="h-1.5 w-1.5 rounded-full"
+                style={{ background: liveQuorumConfigured ? "var(--cp-teal)" : "var(--cp-text-3)" }}
                 aria-hidden
               />
               {liveQuorumConfigured ? "live chain state" : "illustrative mode"}
-            </Pill>
+            </span>
           </div>
-          <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">
+          <h2 className="text-balance text-xl font-semibold tracking-tight sm:text-2xl" style={{ color: "var(--cp-text)" }}>
             The firewall blocking a poisoned output in the Casper VM.
           </h2>
-          <p className="mt-1.5 max-w-xl text-sm text-slate-300">
+          <p className="mt-1.5 max-w-xl text-sm" style={{ color: "var(--cp-text-2)" }}>
             PayoutVault.release composes the registry&apos;s require_quorum guard, so the verify decision and the
             payout settle in one atomic Casper VM call — an off-chain agent cannot skip the check. The attestation
             policy here is quorum: k independent signers attest the same deterministic valuation. Change one byte
             and that output has no quorum, so require_quorum reverts and the release with it.
           </p>
-          <p className="mt-2 max-w-xl text-pretty text-[12px] leading-relaxed text-slate-400">
+          <p className="mt-2 max-w-xl text-pretty text-sm leading-relaxed" style={{ color: "var(--cp-text-2)" }}>
+            Other systems verify then act in two separate calls — the gap is the attack surface. Casproof collapses
+            verify and act into one VM execution.
+          </p>
+          <p className="mt-2 max-w-xl text-pretty text-[12px] leading-relaxed" style={{ color: "var(--cp-text-3)" }}>
             Quorum is one pluggable policy behind the gate — TEE remote-attestation receipts and zkML proofs are on
             the roadmap. Today the trusted signer set is owner-curated and slashing gives it skin in the game;
             proof-of-computation receipts come next.
           </p>
+          <div
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium"
+            style={{ border: "1px solid var(--cp-border-2)", background: "rgba(62,207,178,0.06)", color: "var(--cp-text-2)" }}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: "var(--cp-teal)" }} aria-hidden />
+            Signer reputation and slashing are enforced on-chain — every payout emits the attesting signer.
+          </div>
+          <p className="mt-3 max-w-xl text-pretty text-[13px] leading-relaxed" style={{ color: "var(--cp-text-2)" }}>
+            Honest disclaimer: the signer set here is <strong style={{ color: "var(--cp-text)" }}>owner-curated</strong>,
+            not trustless. The gate enforces quorum and slashing over that set — it does not yet remove the need to
+            trust who is in it.
+          </p>
           {publicConfig.requestId && (
-            <p className="mt-2 font-mono text-[11px] text-slate-500">
-              request <span className="text-slate-400">{publicConfig.requestId}</span>
+            <p className="mt-2 font-mono text-[11px]" style={{ color: "var(--cp-text-3)" }}>
+              request <span style={{ color: "var(--cp-text-2)" }}>{publicConfig.requestId}</span>
             </p>
           )}
         </div>
@@ -84,7 +111,8 @@ export default function QuorumContrast() {
             disabled={genuine.loading || poisoned.loading}
             aria-busy={genuine.loading || poisoned.loading}
             aria-label="Run both outputs through the on-chain quorum gate"
-            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl bg-mint px-4 py-2.5 text-sm font-semibold text-ink-950 shadow-[0_8px_24px_-12px_rgba(52,211,153,0.6)] transition-all hover:bg-mint-soft focus-visible:outline-offset-4 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+            className="group relative inline-flex items-center gap-2 overflow-hidden rounded-xl px-4 py-2.5 text-sm font-semibold shadow-[0_8px_24px_-12px_rgba(62,207,178,0.6)] transition-all focus-visible:outline-offset-4 active:scale-[0.98] disabled:opacity-70 disabled:active:scale-100"
+            style={{ background: "var(--cp-teal)", color: "#0A0A0A" }}
           >
             <span
               aria-hidden
@@ -96,7 +124,8 @@ export default function QuorumContrast() {
           {ran && (
             <button
               onClick={reset}
-              className="rounded-xl border border-white/10 px-3.5 py-2.5 text-sm text-slate-300 transition hover:border-white/20 hover:text-slate-100 active:scale-[0.98]"
+              className="rounded-xl px-3.5 py-2.5 text-sm transition active:scale-[0.98]"
+              style={{ border: "1px solid var(--cp-border-2)", color: "var(--cp-text-2)" }}
             >
               Reset
             </button>
@@ -107,7 +136,7 @@ export default function QuorumContrast() {
       <div className="grid gap-4 lg:grid-cols-2" role="group" aria-live="polite" aria-label="Quorum gate outcomes">
         <QuorumLane
           title="Genuine valuation"
-          subtitle="Quorum-attested output"
+          subtitle="RWA valuation · quorum-attested"
           payload={GENUINE_PAYLOAD}
           lane={genuine}
           ran={ran}
@@ -117,7 +146,7 @@ export default function QuorumContrast() {
         />
         <QuorumLane
           title="Poisoned valuation"
-          subtitle="One byte changed by a compromised agent"
+          subtitle="RWA valuation · one byte tampered by a compromised agent"
           payload={POISONED_PAYLOAD}
           lane={poisoned}
           ran={ran}
@@ -129,9 +158,9 @@ export default function QuorumContrast() {
       </div>
 
       {!ran && (
-        <p className="mt-5 text-center text-xs text-slate-500">
-          Hit <span className="text-slate-300">Run the gate</span> to push both outputs through require_quorum side
-          by side.
+        <p className="mt-5 text-center text-xs" style={{ color: "var(--cp-text-3)" }}>
+          Hit <span style={{ color: "var(--cp-text-2)" }}>Run the gate</span> to push both outputs through
+          require_quorum side by side.
         </p>
       )}
 
@@ -163,35 +192,49 @@ function QuorumLane({
 }) {
   const q = quorumView(lane.result, verdict);
   const settled = ran && !lane.loading && Boolean(lane.result);
-  const pays = settled && q.pays;
+  const neutral = settled && Boolean(q.neutral);
+  const pays = settled && !neutral && q.pays;
 
-  const frame = !settled
-    ? "border-white/10"
+  const frameStyle: React.CSSProperties = !settled || neutral
+    ? { border: "1px solid var(--cp-border)" }
     : pays
-      ? "border-mint/40 shadow-glow"
-      : "border-signal-red/40 shadow-redGlow";
+      ? { border: "1px solid rgba(62,207,178,0.4)", boxShadow: "0 0 0 1px rgba(62,207,178,0.12), 0 24px 80px -32px rgba(62,207,178,0.35)" }
+      : { border: "1px solid rgba(238,68,68,0.4)", boxShadow: "0 0 0 1px rgba(238,68,68,0.18), 0 24px 80px -32px rgba(238,68,68,0.4)" };
 
-  const flourish = settled ? (pays ? "verdict-glow" : "verdict-shake") : "";
+  const flourish = settled && !neutral ? (pays ? "verdict-glow" : "verdict-shake") : "";
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border bg-ink-950/70 backdrop-blur-sm transition-all duration-500 ${frame} ${flourish}`}>
+    <div
+      className={`relative overflow-hidden rounded-2xl backdrop-blur-sm transition-all duration-500 ${flourish}`}
+      style={{ background: "#0B0B0B", ...frameStyle }}
+    >
       {lane.loading && (
         <>
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-mint/10 to-transparent" />
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-12"
+            style={{ background: `linear-gradient(to bottom, ${poisoned ? "rgba(238,68,68,0.10)" : "rgba(62,207,178,0.10)"}, transparent)` }}
+          />
           <div className={`scanline ${poisoned ? "scanline-red" : ""}`} aria-hidden />
         </>
       )}
 
-      <div className="flex items-center justify-between border-b border-white/6 px-5 py-3.5">
+      <div className="flex items-center justify-between px-5 py-3.5" style={{ borderBottom: "1px solid var(--cp-border)" }}>
         <div className="flex items-center gap-2.5">
-          <span className={`h-2 w-2 rounded-full ${poisoned ? "bg-signal-red/70" : "bg-mint/70"} ${lane.loading ? "animate-pulse" : ""}`} />
+          <span
+            className={`h-2 w-2 rounded-full ${lane.loading ? "animate-pulse" : ""}`}
+            style={{ background: poisoned ? "rgba(238,68,68,0.7)" : "rgba(62,207,178,0.7)" }}
+          />
           <div>
-            <div className="text-sm font-semibold text-slate-200">{title}</div>
-            <div className="text-[11px] text-slate-400">{subtitle}</div>
+            <div className="text-sm font-semibold" style={{ color: "var(--cp-text)" }}>{title}</div>
+            <div className="font-mono text-[11px]" style={{ color: "var(--cp-text-3)" }}>{subtitle}</div>
           </div>
         </div>
         {settled ? (
-          <Pill tone={pays ? "good" : "bad"}>{q.threshold > 0 ? `${q.agreement} / ${q.threshold} agree` : `${q.agreement} agree`}</Pill>
+          neutral ? (
+            <Pill tone="muted">chain unread</Pill>
+          ) : (
+            <Pill tone={pays ? "good" : "bad"}>{q.threshold > 0 ? `${q.agreement} / ${q.threshold} agree` : `${q.agreement} agree`}</Pill>
+          )
         ) : lane.loading ? (
           <Pill tone="muted"><Spinner className="h-3 w-3" /> reading</Pill>
         ) : (
@@ -211,8 +254,8 @@ function QuorumLane({
         </div>
       )}
 
-      <div className="border-t border-white/6 px-5 py-3.5">
-        <LaneOutcome lane={lane} ran={ran} q={q} settled={settled} txUrl={txUrl} txLabel={txLabel} />
+      <div className="px-5 py-3.5" style={{ borderTop: "1px solid var(--cp-border)" }}>
+        <LaneOutcome lane={lane} ran={ran} q={q} settled={settled} neutral={neutral} txUrl={txUrl} txLabel={txLabel} />
       </div>
     </div>
   );
@@ -223,6 +266,7 @@ function LaneOutcome({
   ran,
   q,
   settled,
+  neutral,
   txUrl,
   txLabel
 }: {
@@ -230,47 +274,65 @@ function LaneOutcome({
   ran: boolean;
   q: QuorumView;
   settled: boolean;
+  neutral: boolean;
   txUrl?: string;
   txLabel: string;
 }) {
-  if (!ran) return <div className="text-[12px] text-slate-500">awaiting quorum read…</div>;
+  if (!ran) return <div className="text-[12px]" style={{ color: "var(--cp-text-3)" }}>awaiting quorum read…</div>;
   if (lane.loading) {
     return (
-      <div className="flex items-center gap-2 text-[12px] text-slate-400">
+      <div className="flex items-center gap-2 text-[12px]" style={{ color: "var(--cp-text-2)" }}>
         <Spinner className="h-3.5 w-3.5" /> tallying signers on Casper…
       </div>
     );
   }
   if (!settled) return null;
 
+  if (neutral) {
+    return (
+      <div className="flex items-center gap-2.5">
+        <span
+          className="grid h-7 w-7 place-items-center rounded-lg"
+          style={{ background: "rgba(255,255,255,0.04)", color: "var(--cp-text-3)" }}
+        >
+          <WarnGlyph />
+        </span>
+        <div className="leading-tight">
+          <div className="font-mono text-sm font-bold tracking-tight" style={{ color: "var(--cp-text-2)" }}>
+            CHAIN READ FAILED
+          </div>
+          <div className="text-[11px]" style={{ color: "var(--cp-text-3)" }}>{q.reason}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const accent = q.pays ? "var(--cp-teal)" : "#EE4444";
+  const accentSoft = q.pays ? "var(--cp-teal)" : "#EE6A6A";
+
   return (
     <div className="flex items-center justify-between gap-3 animate-[flip-in_0.4s_cubic-bezier(0.16,1,0.3,1)]">
       <div className="flex items-center gap-2.5">
-        <span className={`verdict-pop grid h-7 w-7 place-items-center rounded-lg ${q.pays ? "bg-mint/15 text-mint" : "bg-signal-red/15 text-signal-red"}`}>
+        <span
+          className="verdict-pop grid h-7 w-7 place-items-center rounded-lg"
+          style={{ background: q.pays ? "rgba(62,207,178,0.15)" : "rgba(238,68,68,0.15)", color: accent }}
+        >
           {q.pays ? <CheckIcon className="h-4 w-4" /> : <CrossIcon className="h-4 w-4" />}
         </span>
         <div className="leading-tight">
-          <div className={`text-sm font-bold tracking-tight ${q.pays ? "text-mint-soft" : "text-signal-red"}`}>
-            {q.pays ? "QUORUM → PAY" : "NO QUORUM → BLOCK"}
+          <div className="font-mono text-sm font-bold tracking-tight" style={{ color: accentSoft }}>
+            {q.pays ? "QUORUM → PAY" : "NO QUORUM → REVERT"}
           </div>
-          <div className="text-[11px] text-slate-400">{q.reason}</div>
+          <div className="text-[11px]" style={{ color: "var(--cp-text-2)" }}>{q.reason}</div>
         </div>
       </div>
-      {q.pays && txUrl ? (
+      {txUrl ? (
         <a
           href={txUrl}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-mint-soft/80 transition hover:text-mint-soft"
-        >
-          {txLabel} <ExternalLinkIcon className="h-3 w-3" />
-        </a>
-      ) : !q.pays && txUrl ? (
-        <a
-          href={txUrl}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] font-medium text-signal-red/80 transition hover:text-signal-red"
+          className="inline-flex items-center gap-1 font-mono text-[11px] font-medium transition hover:opacity-80"
+          style={{ color: accentSoft }}
         >
           {txLabel} <ExternalLinkIcon className="h-3 w-3" />
         </a>
@@ -287,50 +349,47 @@ function FooterLinks({ ran, genuine, poisoned }: { ran: boolean; genuine: Lane; 
     return (
       <div
         role="note"
-        className="mt-5 rounded-xl border border-signal-amber/25 bg-signal-amber/[0.06] px-4 py-3.5 text-sm"
+        className="mt-5 rounded-xl px-4 py-3.5 text-sm"
+        style={{ border: "1px solid var(--cp-border-2)", background: "rgba(62,207,178,0.06)" }}
       >
-        <div className="flex items-center gap-2.5 font-semibold text-signal-amber">
+        <div className="flex items-center gap-2.5 font-semibold" style={{ color: "var(--cp-teal)" }}>
           <InfoGlyph />
           Illustrative mode — this is how the gate behaves once a contract is live
         </div>
-        <p className="mt-2 pl-[26px] text-[13px] leading-relaxed text-slate-300">
+        <p className="mt-2 pl-[26px] text-[13px] leading-relaxed" style={{ color: "var(--cp-text-2)" }}>
           The two outcomes below are the real decision logic running against sample data. No transaction hashes are
           shown until a registry is deployed.
         </p>
-        <p className="mt-2 pl-[26px] text-[12px] leading-relaxed text-slate-400">
-          To read genuine quorum state, set{" "}
-          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">NEXT_PUBLIC_REGISTRY_CONTRACT_HASH</code>{" "}
-          and{" "}
-          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">NEXT_PUBLIC_REQUEST_ID</code>{" "}
-          (plus the server{" "}
-          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">REGISTRY_CONTRACT_HASH</code>{" "}
-          /{" "}
-          <code className="rounded bg-ink-950/70 px-1.5 py-0.5 font-mono text-[11.5px] text-slate-200">REQUEST_ID</code>){" "}
-          after deploying.
+        <p className="mt-2 pl-[26px] text-[12px] leading-relaxed" style={{ color: "var(--cp-text-3)" }}>
+          Demo running against the pre-deployed testnet contract. Configure the registry address to read live chain
+          state.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-white/6 pt-4 text-[12px] text-slate-500">
+    <div
+      className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 pt-4 font-mono text-[12px]"
+      style={{ borderTop: "1px solid var(--cp-border)", color: "var(--cp-text-3)" }}
+    >
       {settled && winner && (
-        <span className="font-mono">
-          quorum hash <span className="text-mint-soft/80">{winner.slice(0, 16)}…{winner.slice(-6)}</span>
+        <span>
+          quorum hash <span style={{ color: "var(--cp-teal)" }}>{winner.slice(0, 16)}…{winner.slice(-6)}</span>
         </span>
       )}
       {publicConfig.registryUrl && (
-        <a href={publicConfig.registryUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-mint-soft">
+        <a href={publicConfig.registryUrl} target="_blank" rel="noreferrer" className="cp-mono-link inline-flex items-center gap-1">
           registry contract <ExternalLinkIcon className="h-3 w-3" />
         </a>
       )}
       {publicConfig.vaultConfigured && publicConfig.vaultUrl && (
-        <a href={publicConfig.vaultUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-mint-soft">
+        <a href={publicConfig.vaultUrl} target="_blank" rel="noreferrer" className="cp-mono-link inline-flex items-center gap-1">
           payout vault <ExternalLinkIcon className="h-3 w-3" />
         </a>
       )}
       {publicConfig.attestTxUrl && (
-        <a href={publicConfig.attestTxUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 transition hover:text-mint-soft">
+        <a href={publicConfig.attestTxUrl} target="_blank" rel="noreferrer" className="cp-mono-link inline-flex items-center gap-1">
           attestation tx <ExternalLinkIcon className="h-3 w-3" />
         </a>
       )}
@@ -340,14 +399,25 @@ function FooterLinks({ ran, genuine, poisoned }: { ran: boolean; genuine: Lane; 
 
 interface QuorumView {
   pays: boolean;
+  neutral?: boolean;
   agreement: number;
   threshold: number;
   reason: string;
 }
 
 function quorumView(result: VerifyResult | null, verdict: "pay" | "block"): QuorumView {
-  if (!liveQuorumConfigured || !result || result.error || !result.quorum) {
+  if (!liveQuorumConfigured) {
     return illustrative(verdict, result);
+  }
+  // Live mode: never fall back to a predetermined verdict. A failed/empty chain read is NEUTRAL.
+  if (!result || result.chainError || result.error || !result.quorum) {
+    return {
+      pays: false,
+      neutral: true,
+      agreement: 0,
+      threshold: 0,
+      reason: "chain read failed — could not verify on-chain"
+    };
   }
   const q = result.quorum;
   const pays = q.reached && q.matchesWinner;
@@ -378,14 +448,13 @@ function illustrative(verdict: "pay" | "block", result: VerifyResult | null): Qu
 function Row({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-3">
-      <span className="shrink-0 text-slate-400">{label}</span>
+      <span className="shrink-0" style={{ color: "var(--cp-text-3)" }}>{label}</span>
       <span
-        className={`min-w-0 truncate text-right tabular-nums transition-colors ${
-          highlight ? "rounded bg-signal-red/15 px-1.5 py-0.5 font-semibold text-signal-red" : "text-slate-300"
-        }`}
+        className={`min-w-0 truncate text-right tabular-nums transition-colors ${highlight ? "rounded px-1.5 py-0.5 font-semibold" : ""}`}
+        style={highlight ? { background: "rgba(238,68,68,0.15)", color: "#EE6A6A" } : { color: "var(--cp-text-2)" }}
       >
         {value}
-        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide text-signal-red/80">tampered</span>}
+        {highlight && <span className="ml-1.5 text-[10px] uppercase tracking-wide" style={{ color: "rgba(238,68,68,0.8)" }}>tampered</span>}
       </span>
     </div>
   );
@@ -403,6 +472,14 @@ function ScaleGlyph() {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
       <path d="M12 3v18M5 7h14M5 7 3 13a3 3 0 0 0 6 0L7 7M19 7l-2 6a3 3 0 0 0 6 0l-2-6M7 21h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function WarnGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4" aria-hidden>
+      <path d="M12 9v4M12 17h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

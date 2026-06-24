@@ -17,15 +17,15 @@ export function HashChip({ hash, label = "output hash" }: { hash: string; label?
     <button
       onClick={copy}
       aria-label={`Copy ${label} ${hash}`}
-      className="group flex w-full items-center gap-3 rounded-xl border border-white/8 bg-ink-950/60 px-3.5 py-2.5 text-left transition hover:border-white/16 focus-visible:border-mint/40"
+      className="group flex w-full items-center gap-3 rounded-xl border border-[var(--cp-border)] bg-[#0B0B0B] px-3.5 py-2.5 text-left transition hover:border-[var(--cp-border-2)] focus-visible:border-[var(--cp-teal)]/40"
     >
-      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+      <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--cp-text-3)] font-mono">
         {label}
       </span>
-      <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-slate-300">{hash}</code>
+      <code className="min-w-0 flex-1 truncate font-mono text-[12.5px] text-[var(--cp-text-2)]">{hash}</code>
       <span
         aria-live="polite"
-        className={`shrink-0 text-[11px] font-medium transition ${copied ? "text-mint-soft" : "text-slate-400 group-hover:text-mint-soft"}`}
+        className={`shrink-0 text-[11px] font-medium transition ${copied ? "text-[var(--cp-teal)]" : "text-[var(--cp-text-3)] group-hover:text-[var(--cp-teal)]"}`}
       >
         {copied ? "copied ✓" : "copy"}
       </span>
@@ -36,10 +36,10 @@ export function HashChip({ hash, label = "output hash" }: { hash: string; label?
 type Tone = "neutral" | "good" | "bad" | "muted";
 
 const toneRing: Record<Tone, string> = {
-  neutral: "border-white/10 bg-white/[0.03] text-slate-300",
-  good: "border-mint/35 bg-mint/[0.08] text-mint-soft",
-  bad: "border-signal-red/35 bg-signal-red/[0.08] text-signal-red",
-  muted: "border-white/8 bg-white/[0.02] text-slate-400"
+  neutral: "border-[var(--cp-border)] bg-[var(--cp-surface)] text-[var(--cp-text-2)]",
+  good: "border-[var(--cp-teal)]/35 bg-[var(--cp-teal)]/[0.08] text-[var(--cp-teal)]",
+  bad: "border-[#EE4444]/35 bg-[#EE4444]/[0.08] text-[#EE6A6A]",
+  muted: "border-[var(--cp-border)] bg-[var(--cp-surface)] text-[var(--cp-text-3)]"
 };
 
 export function Pill({ tone = "neutral", children }: { tone?: Tone; children: React.ReactNode }) {

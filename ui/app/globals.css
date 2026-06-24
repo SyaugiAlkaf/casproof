@@ -1,11 +1,24 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
   color-scheme: dark;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Code", Menlo, Consolas, monospace;
+
+  --cp-base: #0a0a0a;
+  --cp-surface: #141414;
+  --cp-teal: #3ecfb2;
+  --cp-red: #ee4444;
+  --cp-text: #f0f0f0;
+  --cp-text-2: #a1a1a1;
+  --cp-text-3: #737373;
+  --cp-border: rgba(255, 255, 255, 0.06);
+  --cp-border-2: rgba(255, 255, 255, 0.13);
 }
 
 html,
@@ -383,5 +396,299 @@ body {
   .scroll-hint {
     animation: none !important;
     opacity: 0.7;
+  }
+}
+
+/* ── Casproof landing (design palette) ───────────────────────── */
+
+.cp-wrap {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: 24px;
+}
+
+.cp-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cp-text-3);
+}
+
+.cp-h1 {
+  font-size: clamp(2.1rem, 5.2vw, 3.6rem);
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-h2 {
+  font-size: clamp(1.5rem, 3.2vw, 2.25rem);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  font-weight: 600;
+  color: var(--cp-text);
+}
+
+.cp-sub {
+  font-size: clamp(1rem, 1.5vw, 1.125rem);
+  line-height: 1.55;
+  color: var(--cp-text-2);
+}
+
+.cp-card {
+  background: var(--cp-surface);
+  border: 1px solid var(--cp-border);
+  border-radius: 16px;
+}
+
+.cp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--cp-border-2);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--cp-text-2);
+}
+
+.cp-chip {
+  border: 1px solid var(--cp-border);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-size: 13px;
+  color: var(--cp-text-2);
+  background: var(--cp-surface);
+}
+
+.cp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-radius: 10px;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: transform 0.12s ease, background 0.18s ease, border-color 0.18s ease;
+}
+.cp-btn:active {
+  transform: scale(0.98);
+}
+.cp-btn-primary {
+  background: var(--cp-teal);
+  color: #04120e;
+}
+.cp-btn-primary:hover {
+  background: #5fe0c7;
+}
+.cp-btn-ghost {
+  background: transparent;
+  border: 1px solid var(--cp-border-2);
+  color: var(--cp-text);
+}
+.cp-btn-ghost:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+/* hero layout */
+.cp-hero-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 48px;
+  align-items: center;
+  justify-items: center;
+  max-width: 900px;
+  margin-inline: auto;
+}
+.cp-hero-copy {
+  text-align: center;
+}
+.cp-hero-copy .cp-h1 {
+  margin-inline: auto;
+  max-width: 25ch;
+}
+.cp-hero-copy .cp-sub {
+  margin-inline: auto;
+  max-width: 60ch;
+}
+.cp-proof {
+  width: 100%;
+  max-width: 620px;
+  margin-inline: auto;
+}
+@media (min-width: 768px) {
+  .cp-hero-grid {
+    gap: 52px;
+  }
+}
+
+.cp-hero-glow {
+  position: absolute;
+  top: -80px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 760px;
+  height: 560px;
+  background: radial-gradient(circle at center, rgba(62, 207, 178, 0.1), rgba(62, 207, 178, 0) 68%);
+  filter: blur(20px);
+  pointer-events: none;
+}
+.cp-hero-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 62% 56% at 50% 42%,
+    rgba(10, 10, 10, 0.94) 0%,
+    rgba(10, 10, 10, 0.6) 38%,
+    rgba(10, 10, 10, 0) 72%
+  );
+  pointer-events: none;
+}
+
+/* hero ASCII layers */
+.cp-ascii {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  opacity: 0.6;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 99%),
+    radial-gradient(ellipse 80% 130% at 50% 50%, #000 44%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to bottom, #000 0%, #000 58%, transparent 99%),
+    radial-gradient(ellipse 80% 130% at 50% 50%, #000 44%, transparent 100%);
+  mask-composite: intersect;
+}
+.cp-ascii pre {
+  position: absolute;
+  top: 0;
+  left: 0;
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 15px;
+  letter-spacing: 2px;
+  white-space: pre;
+  user-select: none;
+}
+.cp-ascii pre.cp-ascii-base {
+  color: #2a7264;
+}
+.cp-ascii pre.cp-ascii-scan {
+  color: #3ecfb2;
+  text-shadow: 0 0 9px rgba(62, 207, 178, 0.55);
+}
+
+.cp-mono-link {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--cp-text-3);
+  transition: color 0.15s ease;
+}
+.cp-mono-link:hover {
+  color: var(--cp-teal);
+}
+
+/* roadmap table */
+.cp-roadmap-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  text-align: left;
+}
+.cp-roadmap-table thead th {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--cp-text-3);
+  font-weight: 500;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--cp-border);
+}
+.cp-roadmap-table tbody tr {
+  border-bottom: 1px solid var(--cp-border);
+}
+.cp-roadmap-table tbody tr:last-child {
+  border-bottom: none;
+}
+.cp-roadmap-table tbody th {
+  font-weight: 600;
+  color: var(--cp-text);
+  padding: 16px 20px;
+  vertical-align: top;
+  white-space: nowrap;
+}
+.cp-roadmap-table tbody td {
+  padding: 16px 20px;
+  vertical-align: top;
+  color: var(--cp-text-2);
+}
+.cp-roadmap-table .cp-roadmap-when {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--cp-text-3);
+  white-space: nowrap;
+}
+.cp-roadmap-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--cp-teal);
+  white-space: nowrap;
+}
+.cp-roadmap-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cp-teal);
+  box-shadow: 0 0 8px rgba(62, 207, 178, 0.7);
+}
+.cp-roadmap-unlocks {
+  line-height: 1.55;
+  min-width: 18rem;
+}
+
+@media (max-width: 720px) {
+  .cp-card:has(.cp-roadmap-table) {
+    overflow-x: auto;
+  }
+  .cp-roadmap-table {
+    min-width: 560px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .cp-hero-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 860px) {
+  .cp-flow-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+@media (max-width: 768px) {
+  .cp-wrap {
+    padding-inline: 20px;
+  }
+  .cp-header-tag {
+    display: none !important;
+  }
+}
+@media (max-width: 560px) {
+  .cp-cta-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .cp-btn {
+    justify-content: center;
   }
 }

@@ -73,11 +73,11 @@ function ConnectInner() {
       <button
         onClick={disconnect}
         title="Disconnect wallet"
-        className="group inline-flex items-center gap-2 rounded-full border border-mint/25 bg-mint/[0.06] px-3.5 py-2 text-sm font-medium text-mint-soft transition hover:border-mint/50 hover:bg-mint/10"
+        className="group inline-flex items-center gap-2 rounded-full border border-[var(--cp-teal)]/25 bg-[var(--cp-teal)]/[0.06] px-3.5 py-2 text-sm font-medium text-[var(--cp-teal)] transition hover:border-[var(--cp-teal)]/50 hover:bg-[var(--cp-teal)]/10"
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-mint shadow-[0_0_8px] shadow-mint" />
+        <span className="h-1.5 w-1.5 rounded-full bg-[var(--cp-teal)] shadow-[0_0_8px] shadow-[var(--cp-teal)]" />
         <span className="font-mono text-[13px] tracking-tight">{shortKey(account.public_key)}</span>
-        <span className="text-[11px] uppercase tracking-wider text-mint/50 transition group-hover:text-signal-red/80">
+        <span className="text-[11px] uppercase tracking-wider text-[var(--cp-teal)]/50 transition group-hover:text-[#EE6A6A]">
           ✕
         </span>
       </button>
@@ -88,7 +88,7 @@ function ConnectInner() {
     <button
       onClick={connect}
       disabled={!clickRef || busy}
-      className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/[0.04] px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/25 hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-50"
+      className="inline-flex items-center gap-2 rounded-full border border-[var(--cp-border-2)] bg-[var(--cp-surface)] px-4 py-2 text-sm font-medium text-[var(--cp-text)] transition hover:border-[var(--cp-teal)]/50 hover:bg-[var(--cp-teal)]/[0.06] disabled:cursor-not-allowed disabled:opacity-50"
     >
       <WalletGlyph />
       {busy ? "Connecting…" : "Connect wallet"}
@@ -104,7 +104,7 @@ class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   render() {
     if (this.state.failed) {
       return (
-        <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-slate-500">
+        <span className="inline-flex items-center gap-2 rounded-full border border-[var(--cp-border)] bg-[var(--cp-surface)] px-4 py-2 text-sm text-[var(--cp-text-3)]">
           <WalletGlyph />
           Connect wallet
         </span>

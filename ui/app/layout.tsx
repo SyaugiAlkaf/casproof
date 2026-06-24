@@ -16,7 +16,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className="min-h-screen bg-ink-950 font-sans text-slate-200 antialiased">
+      <body
+        className="min-h-screen font-sans antialiased"
+        style={{ background: "#0a0a0a", color: "#f0f0f0" }}
+      >
         <StyledRegistry>{children}</StyledRegistry>
       </body>
     </html>

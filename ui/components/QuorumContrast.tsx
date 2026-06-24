@@ -42,7 +42,7 @@ export default function QuorumContrast() {
   };
 
   return (
-    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-900/40 p-6 sm:p-8">
+    <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-900/60 p-6 backdrop-blur-sm sm:p-8">
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-mint/40 to-transparent" />
 
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -57,10 +57,10 @@ export default function QuorumContrast() {
               {liveQuorumConfigured ? "live chain state" : "illustrative mode"}
             </Pill>
           </div>
-          <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
+          <h2 className="text-balance text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">
             The firewall blocking a poisoned output in the Casper VM.
           </h2>
-          <p className="mt-1.5 max-w-xl text-sm text-slate-400">
+          <p className="mt-1.5 max-w-xl text-sm text-slate-300">
             PayoutVault.release composes the registry&apos;s require_quorum guard, so the verify decision and the
             payout settle in one atomic Casper VM call — an off-chain agent cannot skip the check. The attestation
             policy here is quorum: k independent signers attest the same deterministic valuation. Change one byte
@@ -174,7 +174,7 @@ function QuorumLane({
   const flourish = settled ? (pays ? "verdict-glow" : "verdict-shake") : "";
 
   return (
-    <div className={`relative overflow-hidden rounded-2xl border bg-ink-950/50 transition-all duration-500 ${frame} ${flourish}`}>
+    <div className={`relative overflow-hidden rounded-2xl border bg-ink-950/70 backdrop-blur-sm transition-all duration-500 ${frame} ${flourish}`}>
       {lane.loading && (
         <>
           <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-mint/10 to-transparent" />

@@ -26,23 +26,24 @@ export default function WhatIsCasproof() {
   return (
     <section aria-labelledby="what-title" className="mt-20">
       <div className="mb-6 flex items-center gap-3">
-        <h2 id="what-title" className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(34,211,238,0.7)]" aria-hidden />
+        <h2 id="what-title" className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
           What is Casproof
         </h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        <div className="h-px flex-1 bg-gradient-to-r from-accent/30 via-white/10 to-transparent" />
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.05fr_1fr] lg:items-start">
-        <div className="rounded-2xl border border-white/8 bg-ink-900/40 p-6 sm:p-7">
-          <p className="text-pretty text-[15px] leading-relaxed text-slate-300 sm:text-base">
+        <div className="rounded-2xl border border-white/8 bg-ink-900/60 p-6 backdrop-blur-sm sm:p-7">
+          <p className="text-pretty text-[15px] leading-relaxed text-slate-200 sm:text-base">
             Autonomous AI agents now pay each other for outputs — a price feed, a risk score, an RWA valuation. Act
-            on a <span className="font-medium text-signal-red/90">tampered or forged</span> output and you lose real
+            on a <span className="font-semibold text-signal-red">tampered or forged</span> output and you lose real
             money, and today there is no on-chain way to know the output is genuine.
           </p>
-          <p className="mt-4 text-pretty text-[15px] leading-relaxed text-slate-300 sm:text-base">
-            Casproof makes the consuming smart contract <span className="font-medium text-mint-soft">refuse to act</span>{" "}
+          <p className="mt-4 text-pretty text-[15px] leading-relaxed text-slate-200 sm:text-base">
+            Casproof makes the consuming smart contract <span className="font-semibold text-mint-soft">refuse to act</span>{" "}
             unless the output is verified. The verify decision and the payout run in{" "}
-            <span className="font-medium text-slate-100">one atomic Casper VM call</span> — so no off-chain step can
+            <span className="font-semibold text-slate-50">one atomic Casper VM call</span> — so no off-chain step can
             skip the check.
           </p>
           <p className="mt-4 text-pretty text-[13px] leading-relaxed text-slate-400">
@@ -55,7 +56,7 @@ export default function WhatIsCasproof() {
           {BEATS.map((b, i) => (
             <li
               key={b.key}
-              className={`relative overflow-hidden rounded-2xl border bg-ink-950/50 p-4 sm:p-5 ${
+              className={`relative overflow-hidden rounded-2xl border bg-ink-950/70 p-4 backdrop-blur-sm sm:p-5 ${
                 i === 2 ? "border-signal-red/20" : "border-mint/15"
               }`}
             >
@@ -70,8 +71,8 @@ export default function WhatIsCasproof() {
                   {b.n}
                 </span>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-semibold text-slate-100">{b.title}</h3>
-                  <p className="mt-1 text-pretty text-[13px] leading-relaxed text-slate-400">{b.line}</p>
+                  <h3 className="text-sm font-semibold text-slate-50">{b.title}</h3>
+                  <p className="mt-1 text-pretty text-[13px] leading-relaxed text-slate-300">{b.line}</p>
                 </div>
               </div>
               <pre

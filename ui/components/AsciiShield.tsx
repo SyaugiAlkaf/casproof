@@ -256,21 +256,21 @@ export default function AsciiShield() {
           let color: string;
           let glow = 0;
           if (l > 0.84) {
-            color = "#eafffb";
+            color = "#ccfbf1";
             glow = 9;
           } else if (l > 0.62) {
             color = "#5eead4";
-            glow = 5;
+            glow = 6;
           } else if (l > 0.4) {
-            color = "#34d399";
+            color = "#2dd4bf";
           } else if (l > 0.2) {
-            color = "#2f7d6b";
+            color = "#218a8a";
           } else {
             color = "#243046";
           }
 
           if (glow > 0) {
-            ctx.shadowColor = "rgba(52,211,153,0.55)";
+            ctx.shadowColor = "rgba(45,212,191,0.6)";
             ctx.shadowBlur = glow;
           }
           ctx.fillStyle = color;

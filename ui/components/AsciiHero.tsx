@@ -66,8 +66,9 @@ function ScrollCue() {
 function ShieldBackground() {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
-      <div className="absolute left-1/2 top-1/2 h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/[0.10] blur-[140px] sm:h-[820px] sm:w-[820px]" />
-      <div className="absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint-soft/[0.10] blur-[80px]" />
+      <div className="absolute left-1/2 top-1/2 h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/[0.16] blur-[140px] sm:h-[820px] sm:w-[820px]" />
+      <div className="absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint-soft/[0.16] blur-[80px]" />
+      <div className="absolute left-[38%] top-[44%] h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/[0.10] blur-[120px]" />
       <AsciiShield />
       <CrtOverlay />
     </div>
@@ -154,7 +155,7 @@ function Wordmark() {
       </h1>
       <pre
         aria-hidden="true"
-        className="ascii-wordmark m-0 inline-block whitespace-pre bg-gradient-to-br from-mint-soft via-mint to-mint-deep bg-clip-text text-center font-mono font-bold leading-[1.04] text-transparent"
+        className="ascii-wordmark m-0 inline-block whitespace-pre bg-gradient-to-br from-cyan-300 via-mint-soft to-teal-400 bg-clip-text text-center font-mono font-bold leading-[1.04] text-transparent"
         style={{ fontSize: "clamp(4px, 2.1vw, 14px)" }}
       >
         {cells.map((row, r) => (
@@ -216,12 +217,12 @@ function CtaRow() {
           <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </a>
-      <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-400">
+      <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-300">
         <span className="relative flex h-1.5 w-1.5">
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
           <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
         </span>
-        genuine → PAY · poisoned → REVERT
+        <span className="text-mint-soft">genuine → PAY</span> · <span className="text-signal-red">poisoned → REVERT</span>
       </span>
     </div>
   );

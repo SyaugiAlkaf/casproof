@@ -87,13 +87,14 @@ export default function IntegrationShowcase() {
   return (
     <section aria-labelledby="integration-title" className="mt-20">
       <div className="mb-6 flex items-center gap-3">
-        <h2 id="integration-title" className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+        <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(34,211,238,0.7)]" aria-hidden />
+        <h2 id="integration-title" className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
           Integration
         </h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        <div className="h-px flex-1 bg-gradient-to-r from-accent/30 via-white/10 to-transparent" />
       </div>
 
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-900/40 p-6 sm:p-8">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-ink-900/60 p-6 backdrop-blur-sm sm:p-8">
         <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-mint/40 to-transparent" />
 
         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -102,12 +103,12 @@ export default function IntegrationShowcase() {
               <Pill tone="neutral">drop-in</Pill>
               <Pill tone="good">verify-before-act</Pill>
             </div>
-            <h3 className="text-balance text-xl font-semibold tracking-tight text-slate-100 sm:text-2xl">
+            <h3 className="text-balance text-xl font-semibold tracking-tight text-slate-50 sm:text-2xl">
               Drop it into your stack — verify-before-act in 2 lines.
             </h3>
-            <p className="mt-1.5 max-w-2xl text-sm text-slate-400">
-              Reads on-chain quorum + attestation, returns <span className="text-mint-soft">PROCEED</span> /{" "}
-              <span className="text-signal-red">BLOCK</span>. Python &amp; HTTP work today; the write side (attest)
+            <p className="mt-1.5 max-w-2xl text-sm text-slate-300">
+              Reads on-chain quorum + attestation, returns <span className="font-semibold text-mint-soft">PROCEED</span> /{" "}
+              <span className="font-semibold text-signal-red">BLOCK</span>. Python &amp; HTTP work today; the write side (attest)
               is in the TS CLI.
             </p>
           </div>

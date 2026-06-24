@@ -9,8 +9,8 @@ const PIECES = [
 export default function CasperStack() {
   return (
     <section aria-labelledby="stack-title" className="mt-16">
-      <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/[0.06] bg-white/[0.015] px-6 py-7">
-        <h2 id="stack-title" className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-400">
+      <div className="flex flex-col items-center gap-5 rounded-2xl border border-white/[0.06] bg-ink-900/50 px-6 py-7 backdrop-blur-sm">
+        <h2 id="stack-title" className="text-[11px] font-medium uppercase tracking-[0.22em] text-slate-300">
           Built on the Casper stack
         </h2>
         <ul className="flex flex-wrap items-center justify-center gap-2.5">

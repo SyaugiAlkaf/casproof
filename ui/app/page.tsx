@@ -6,6 +6,7 @@ import IntegrationShowcase from "@/components/IntegrationShowcase";
 import HowItWorks from "@/components/HowItWorks";
 import CasperStack from "@/components/CasperStack";
 import AsciiHero from "@/components/AsciiHero";
+import AsciiField from "@/components/AsciiField";
 import Reveal from "@/components/Reveal";
 
 const REPO_URL = "https://github.com/SyaugiAlkaf/casproof";
@@ -19,6 +20,7 @@ export default function Page() {
       >
         Skip to the verify gate
       </a>
+      <AsciiField />
       <Backdrop />
       <Header />
 
@@ -35,10 +37,11 @@ export default function Page() {
 
         <Reveal className="mt-20 block scroll-mt-24" id="demo">
           <div className="mb-6 flex items-center gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(34,211,238,0.7)]" aria-hidden />
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">
               See it block a poisoned feed — live on testnet
             </h2>
-            <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+            <div className="h-px flex-1 bg-gradient-to-r from-accent/30 via-white/10 to-transparent" />
           </div>
           <QuorumContrast />
         </Reveal>
@@ -67,7 +70,7 @@ const TOOLKIT_CHIPS = ["Odra", "casper-js-sdk", "x402", "MCP", "CSPR.click"];
 
 function Footer() {
   return (
-    <footer className="relative z-10 border-t border-white/[0.06]">
+    <footer className="relative z-10 border-t border-white/[0.06] bg-ink-950/60 backdrop-blur-sm">
       <div className="mx-auto max-w-6xl px-5 py-10 sm:px-8">
         <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-sm">

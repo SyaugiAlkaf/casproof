@@ -38,14 +38,15 @@ export default function HowItWorks() {
   return (
     <section aria-label="How Casproof works">
       <div className="mb-6 flex items-center gap-3">
-        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">How it works</h2>
-        <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+        <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_8px_rgba(34,211,238,0.7)]" aria-hidden />
+        <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">How it works</h2>
+        <div className="h-px flex-1 bg-gradient-to-r from-accent/30 via-white/10 to-transparent" />
       </div>
       <div className="grid gap-3 md:grid-cols-3">
         {STEPS.map((s, i) => (
           <div
             key={s.n}
-            className="group relative overflow-hidden rounded-2xl border border-white/8 bg-ink-900/40 p-5 transition hover:border-white/16"
+            className="group relative overflow-hidden rounded-2xl border border-white/8 bg-ink-900/60 p-5 backdrop-blur-sm transition hover:border-white/16"
           >
             <div className="mb-4 flex items-center justify-between">
               <span
@@ -59,8 +60,8 @@ export default function HowItWorks() {
               </span>
               <span className="font-mono text-xs text-slate-600">{s.n}</span>
             </div>
-            <h3 className="text-sm font-semibold text-slate-100">{s.title}</h3>
-            <p className="mt-1.5 text-pretty text-[13px] leading-relaxed text-slate-400">{s.body}</p>
+            <h3 className="text-sm font-semibold text-slate-50">{s.title}</h3>
+            <p className="mt-1.5 text-pretty text-[13px] leading-relaxed text-slate-300">{s.body}</p>
             {i < STEPS.length - 1 && (
               <span className="pointer-events-none absolute -right-3 top-1/2 hidden -translate-y-1/2 text-slate-700 md:block">
                 <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden>

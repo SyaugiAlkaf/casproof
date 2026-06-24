@@ -18,6 +18,10 @@ const config: Config = {
           soft: "#5eead4",
           deep: "#0f766e"
         },
+        accent: {
+          DEFAULT: "#22d3ee",
+          soft: "#67e8f9"
+        },
         signal: {
           red: "#f87171",
           redDeep: "#7f1d1d",
@@ -37,7 +41,8 @@ const config: Config = {
         redGlow: "0 0 0 1px rgba(248,113,113,0.18), 0 24px 80px -32px rgba(248,113,113,0.4)"
       },
       backgroundImage: {
-        "radial-fade": "radial-gradient(120% 120% at 50% -10%, rgba(45,212,191,0.10) 0%, rgba(5,6,10,0) 55%)"
+        "radial-fade":
+          "radial-gradient(120% 120% at 50% -10%, rgba(45,212,191,0.16) 0%, rgba(34,211,238,0.06) 32%, rgba(5,6,10,0) 60%)"
       }
     }
   },

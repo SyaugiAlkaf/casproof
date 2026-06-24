@@ -153,7 +153,7 @@ export async function runQuorum(
 }
 
 async function main() {
-  const reqId = process.env.REQUEST_ID ?? requestId(RWA_PROMPT, "live");
+  const reqId = process.env.REQUEST_ID || requestId(RWA_PROMPT, "live");
   console.log(`request ${reqId}: ${modelAgents().length} model agents attesting an RWA valuation`);
   const results = await runQuorum(reqId);
   const hashes = new Set(results.map((r) => r.outputHash));

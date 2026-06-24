@@ -12,20 +12,26 @@ That is the gap Casproof closes. `registry.require_quorum(request_id, output_has
 
 ## Live on Casper testnet
 
-All transactions below are on `casper-test`. Paste the deploy hashes after running the commands in the Quickstart section.
+All transactions are on `casper-test` and verifiable on the explorer. Reproduce with the Quickstart commands below.
 
-| Step | Command | Transaction |
-|---|---|---|
-| Registry deploy | `npm run deploy` | `https://testnet.cspr.live/deploy/<paste after npm run deploy>` |
-| Vault deploy | `npm run deploy:vault` | `https://testnet.cspr.live/deploy/<paste after npm run deploy:vault>` |
-| Set quorum (k=3) | `npm run setup` | `https://testnet.cspr.live/deploy/<paste after npm run setup>` |
-| Model-A attest | `npm run demo` (agent 0) | `https://testnet.cspr.live/deploy/<paste agent-0 tx hash>` |
-| Model-B attest | `npm run demo` (agent 1) | `https://testnet.cspr.live/deploy/<paste agent-1 tx hash>` |
-| Model-C attest | `npm run demo` (agent 2) | `https://testnet.cspr.live/deploy/<paste agent-2 tx hash>` |
-| PayoutVault.release (quorum met) | `npm run demo` (consumer, genuine) | `https://testnet.cspr.live/deploy/<paste release tx hash>` |
-| PayoutVault.release REVERT (poisoned) | `npm run demo` (consumer, poisoned) | `https://testnet.cspr.live/deploy/<paste revert tx hash>` |
+**Deployed contracts:**
 
-> Deploy is human-gated (faucet funds each key once). Run the Quickstart commands and paste the printed deploy hashes above.
+| Contract | Hash |
+|---|---|
+| AttestationRegistry | [`1ef8d1ad...f91dc2`](https://testnet.cspr.live/contract/1ef8d1adf9078fbd392990685ba461785b03b77fb3f45ba5dd00bdbef5f91dc2) |
+| PayoutVault | [`1d0efbdd...42fe319`](https://testnet.cspr.live/contract/1d0efbdddea74baf8b180f33c5697b9efa346270e539334cf46978a4f42fe319) |
+
+**Request panel:** request id `823d1427b2bdfbae-mqrk0lcn` · k=2 of 2 signers (claude-opus-4-8, claude-sonnet-4-6)
+
+| Step | Transaction |
+|---|---|
+| Registry deploy (AttestationRegistry install) | [ac63abe6...815fd6](https://testnet.cspr.live/deploy/ac63abe6b41030f7279ddeca2893d5461ce3ce69dd8ab26547287d77c9815fd6) |
+| set_quorum(2) | [26b828ff...7a74c60](https://testnet.cspr.live/deploy/26b828ff3c5fb70581700f463719c6294bc0a9e728e1c40e2a8f107ff7a74c60) |
+| set_trusted (onboard claude-sonnet-4-6 signer) | [779d8944...9fee01](https://testnet.cspr.live/deploy/779d8944a6e0ca885a32665c8959a7e64a993ddf1bf4d532cac9344d079fee01) |
+| Vault deploy (PayoutVault install) | [2f2aebad...4293e8](https://testnet.cspr.live/deploy/2f2aebadc10301da75023c05c9f54628247dfe39be294042e66372f28b4293e8) |
+| Genuine attestation (claude-opus-4-8 signer) | [96764d94...3d054bd](https://testnet.cspr.live/deploy/96764d94c84aa5ffc190de103c683bacf9a319638a282568079d610c33d054bd) |
+| PayoutVault.release SUCCESS (quorum met, PAY) | [4e419629...475bb730](https://testnet.cspr.live/deploy/4e419629ee121636bb93b7b2f2bf86662190c88b68cc4a3c32a19014475bb730) |
+| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [08215a1e...8246aa81](https://testnet.cspr.live/deploy/08215a1e12fec76e53f59a10404bea518cf8d5c6f359512964f6054d8246aa81) |
 
 ## The problem
 
@@ -66,7 +72,7 @@ Today the trusted signer set is owner-curated. That is the right tradeoff for a 
 A curated signer could in principle attest any hash, including one they did not genuinely compute. Two mitigations are live now:
 
 - **Slashing.** `registry.slash(signer)` (owner-only) revokes trust and reduces the signer's reputation score (`attestation_count - slashes`). Reputation falls when you lie, so there is a cost — skin in the game for the curated set.
-- **Quorum size.** Compromising k signers independently is harder than compromising one. k=3 across three separate keys is the default.
+- **Quorum size.** Compromising k signers independently is harder than compromising one. The live demo runs k=2 across two independent model keys; the value is configurable via `set_quorum`.
 
 The roadmap mitigation is binding attestations to proof-of-computation receipts — TEE remote-attestation or zkML — so a signer cannot attest a hash without evidence the computation actually ran. That turns the curated set into a verified-computation set. Until then, the system is "trust this panel plus slashing" not "trust nobody."
 

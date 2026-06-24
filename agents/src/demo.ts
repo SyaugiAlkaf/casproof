@@ -8,7 +8,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
   const agents = modelAgents();
-  const reqId = process.env.REQUEST_ID ?? requestId(RWA_PROMPT, Date.now().toString(36));
+  const reqId = process.env.REQUEST_ID || requestId(RWA_PROMPT, Date.now().toString(36));
 
   console.log("── Casproof: multi-model quorum integrity demo ───────────────");
   console.log(`request ${reqId} — valuing ${RWA_INPUTS.asset} with ${agents.length} independent model agents\n`);
@@ -26,7 +26,7 @@ async function main() {
   console.log("\n2. the registry tallies distinct signers and forms quorum in the VM");
   let quorum: string | null = null;
   for (let i = 0; i < 8 && !quorum; i++) {
-    quorum = await readQuorum(reqId);
+    quorum = await readQuorum(reqId).catch(() => null);
     if (!quorum) await sleep(3000);
   }
   const agreed = await readAgreement(reqId, genuineHash).catch(() => 0);

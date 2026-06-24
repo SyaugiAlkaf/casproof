@@ -18,6 +18,30 @@ Verifiable inference (zkML, TEE remote-attestation, opML) is not Casproof's clai
 
 ---
 
+## Deployed on testnet
+
+Both contracts are live on `casper-test`. All transactions are verifiable at `https://testnet.cspr.live/deploy/<hash>`.
+
+| Item | Value |
+|---|---|
+| Registry contract hash | [`1ef8d1adf9078fbd392990685ba461785b03b77fb3f45ba5dd00bdbef5f91dc2`](https://testnet.cspr.live/contract/1ef8d1adf9078fbd392990685ba461785b03b77fb3f45ba5dd00bdbef5f91dc2) |
+| Registry package hash | `a8ec43e8a5e67e375ab0c7bb259627d3ac3dab164ce2d5dc3980bbf11a564645` |
+| Vault contract hash | [`1d0efbdddea74baf8b180f33c5697b9efa346270e539334cf46978a4f42fe319`](https://testnet.cspr.live/contract/1d0efbdddea74baf8b180f33c5697b9efa346270e539334cf46978a4f42fe319) |
+| Deployer account | `account-hash-1c4052f115a1cfa7267c046c8bcbdaea5ab88737dc8df09422a195a14499901f` |
+| Demo request id | `823d1427b2bdfbae-mqrk0lcn` |
+| Quorum panel | k=2 of 2 (claude-opus-4-8, claude-sonnet-4-6) |
+
+Key transactions:
+
+| Event | Deploy hash |
+|---|---|
+| PayoutVault.release PAY (quorum met) | [4e419629ee121636bb93b7b2f2bf86662190c88b68cc4a3c32a19014475bb730](https://testnet.cspr.live/deploy/4e419629ee121636bb93b7b2f2bf86662190c88b68cc4a3c32a19014475bb730) |
+| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [08215a1e12fec76e53f59a10404bea518cf8d5c6f359512964f6054d8246aa81](https://testnet.cspr.live/deploy/08215a1e12fec76e53f59a10404bea518cf8d5c6f359512964f6054d8246aa81) |
+
+Full transaction list is in the README "Live on Casper testnet" table.
+
+---
+
 ## Contracts
 
 Both contracts are implemented in Rust with [Odra](https://odra.dev) (compiles to WASM). They are deployed as separate named keys on Casper and interact via cross-contract calls using the `External` Odra pattern.

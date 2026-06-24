@@ -12,8 +12,6 @@ const {
   Args,
   CLValue,
   ContractCallBuilder,
-  ParamDictionaryIdentifier,
-  ParamDictionaryIdentifierURef,
   PurseIdentifier,
 } = sdk;
 type PrivateKey = InstanceType<typeof sdk.PrivateKey>;
@@ -34,12 +32,12 @@ const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
   .filter(Boolean);
 
 // Field indices track the storage-field declaration order in AttestationRegistry
-// (contract/src/lib.rs). Odra keys each module field by its position, so these MUST
-// stay in lockstep with the struct: owner(0), quorum_threshold(1), trusted(2),
-// attestation_count(3), attestations(4), agreement(5), quorum_output(6), voted(7).
-const ATTESTATIONS_FIELD_INDEX = 4;
-const AGREEMENT_FIELD_INDEX = 5;
-const QUORUM_OUTPUT_FIELD_INDEX = 6;
+// (contract/src/lib.rs). Odra numbers module fields from 1, so the struct maps to:
+// owner(1), quorum_threshold(2), trusted(3), attestation_count(4), attestations(5),
+// agreement(6), quorum_output(7), voted(8), slashes(9). Verified on testnet.
+const ATTESTATIONS_FIELD_INDEX = 5;
+const AGREEMENT_FIELD_INDEX = 6;
+const QUORUM_OUTPUT_FIELD_INDEX = 7;
 const STATE_DICTIONARY = "state";
 
 export const rpc = new RpcClient(new HttpHandler(NODE_URL));
@@ -209,52 +207,78 @@ export async function findAttestation(outputHash: string): Promise<AttestationRe
 // threshold yet. Reads the quorum_output dictionary directly from the node.
 export async function readQuorum(reqId: string): Promise<string | null> {
   requireContract();
-  const stored = await readStateItem(QUORUM_OUTPUT_FIELD_INDEX, reqId);
-  if (stored === null) return null;
-  return parseHashValue(stored);
+  const b = await readStateBytes(QUORUM_OUTPUT_FIELD_INDEX, reqId);
+  return b ? decodeString(b) : null;
 }
 
 // How many distinct trusted signers have attested this exact output for this request.
 export async function readAgreement(reqId: string, outputHash: string): Promise<number> {
   requireContract();
-  const stored = await readStateItem(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
-  if (stored === null) return 0;
-  return parseNumberValue(stored);
+  const b = await readStateBytes(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
+  return b ? u32le(b) : 0;
 }
 
-async function readStateItem(fieldIndex: number, key: string): Promise<unknown | null> {
+// Odra stores each field value as a CLValue List<U8> (the bytesrepr of the underlying type).
+// Read it raw and return the decoded byte array, or null if the item does not exist.
+async function readStateBytes(fieldIndex: number, key: string): Promise<number[] | null> {
   const seedUref = await resolveStateUref();
   const itemKey = stateItemKey(fieldIndex, key);
-  const identifier = new ParamDictionaryIdentifier(
-    undefined,
-    undefined,
-    new ParamDictionaryIdentifierURef(itemKey, seedUref)
-  );
-  try {
-    return await rpc.getDictionaryItemByIdentifier(null, identifier);
-  } catch (e) {
-    if (isNotFound(e)) return null;
-    throw e;
-  }
+  const srh = await stateRootHash();
+  const body = {
+    jsonrpc: "2.0",
+    id: 1,
+    method: "state_get_dictionary_item",
+    params: { state_root_hash: srh, dictionary_identifier: { URef: { seed_uref: seedUref, dictionary_item_key: itemKey } } },
+  };
+  const r = await fetch(NODE_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  const j = (await r.json()) as { result?: { stored_value?: { CLValue?: { parsed?: unknown } } } };
+  const parsed = j.result?.stored_value?.CLValue?.parsed;
+  return Array.isArray(parsed) ? (parsed as number[]) : null;
+}
+
+async function stateRootHash(): Promise<string> {
+  const body = { jsonrpc: "2.0", id: 1, method: "chain_get_state_root_hash", params: {} };
+  const r = await fetch(NODE_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  return ((await r.json()) as { result?: { state_root_hash?: string } }).result?.state_root_hash ?? "";
+}
+
+function u32le(b: number[], off = 0): number {
+  return (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) >>> 0;
+}
+
+// Odra String = u32_le(len) ++ utf8 bytes.
+function decodeString(b: number[]): string {
+  return Buffer.from(b.slice(4, 4 + u32le(b))).toString("utf8");
+}
+
+// Odra Address = Key = 1-byte tag (00 = account, 01 = hash) ++ 32-byte hash.
+function decodeSigner(b: number[]): string {
+  const hex = Buffer.from(b.slice(1, 33)).toString("hex");
+  return b[0] === 0 ? `account-hash-${hex}` : `hash-${hex}`;
 }
 
 async function readAttestationOnChain(outputHash: string): Promise<AttestationRecord | null> {
-  const stored = await readStateItem(ATTESTATIONS_FIELD_INDEX, outputHash);
-  if (stored === null) return null;
-  return { signer: extractSigner(stored), source: "chain", raw: (stored as { rawJSON?: unknown }).rawJSON ?? stored };
+  const b = await readStateBytes(ATTESTATIONS_FIELD_INDEX, outputHash);
+  if (!b) return null;
+  return { signer: decodeSigner(b), source: "chain", raw: b };
 }
 
 let cachedUref: string | undefined;
+// Casper 2.0 (Condor) doesn't resolve a contract named key by path, so we read the
+// whole stored Contract and pull the `state` dictionary seed uref from its named_keys.
 async function resolveStateUref(): Promise<string> {
   if (cachedUref) return cachedUref;
   let lastErr: unknown;
   for (const key of contractKeyFormats(CONTRACT_HASH)) {
     try {
-      const res = await rpc.queryLatestGlobalState(key, [STATE_DICTIONARY]);
-      const uref = urefOf(res);
-      if (uref) {
-        cachedUref = uref;
-        return uref;
+      const body = { jsonrpc: "2.0", id: 1, method: "query_global_state", params: { key, path: [] } };
+      const r = await fetch(NODE_URL, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      const j = (await r.json()) as { result?: { stored_value?: { Contract?: { named_keys?: Array<{ name: string; key: string }> } } } };
+      const namedKeys = j.result?.stored_value?.Contract?.named_keys ?? [];
+      const entry = namedKeys.find((nk) => nk.name === STATE_DICTIONARY);
+      if (entry?.key?.startsWith("uref-")) {
+        cachedUref = entry.key;
+        return entry.key;
       }
     } catch (e) {
       lastErr = e;
@@ -340,31 +364,6 @@ async function findAttestationViaEvents(outputHash: string): Promise<Attestation
 
 function contractKeyFormats(hash: string): string[] {
   return [`hash-${hash}`, `entity-contract-${hash}`, hash];
-}
-
-function urefOf(res: unknown): string | undefined {
-  const m = JSON.stringify(res).match(/uref-[0-9a-f]{64}-[0-9a-f]{3}/i);
-  return m?.[0];
-}
-
-function extractSigner(stored: unknown): string {
-  const m = JSON.stringify(stored).match(/(account-hash-[0-9a-f]{64}|0[12][0-9a-f]{64})/i);
-  return m?.[0] ?? "";
-}
-
-// The registry stores a CLString output hash; CLValue JSON carries it under "parsed".
-function parseHashValue(stored: unknown): string | null {
-  const s = JSON.stringify(stored);
-  const parsed = s.match(/"parsed"\s*:\s*"([0-9a-fA-F]{64})"/);
-  if (parsed) return parsed[1].toLowerCase();
-  const any = s.match(/[0-9a-f]{64}/i);
-  return any ? any[0].toLowerCase() : null;
-}
-
-function parseNumberValue(stored: unknown): number {
-  const s = JSON.stringify(stored);
-  const parsed = s.match(/"parsed"\s*:\s*(\d+)/);
-  return parsed ? Number(parsed[1]) : 0;
 }
 
 function hashHex(h: { transactionV1?: { toHex(): string }; deploy?: { toHex(): string } }): string {

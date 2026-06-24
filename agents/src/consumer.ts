@@ -49,7 +49,7 @@ export async function autonomousRelease(
 
   let quorumHash: string | null = null;
   for (let i = 0; i < tries; i++) {
-    quorumHash = await readQuorum(reqId);
+    quorumHash = await readQuorum(reqId).catch(() => null);
     if (quorumHash) break;
     await sleep(intervalMs);
   }
@@ -75,7 +75,7 @@ export function releasePayout(feed: AgentOutput): string {
 }
 
 async function main() {
-  const reqId = process.env.REQUEST_ID ?? requestId(RWA_PROMPT, "live");
+  const reqId = process.env.REQUEST_ID || requestId(RWA_PROMPT, "live");
   const key = loadKey(process.env.CONSUMER_KEY_PATH ?? "./keys/consumer_secret_key.pem");
   const beneficiary = key.publicKey.accountHash().toPrefixedString();
   const { produceFeed, modelAgents } = await import("./producer.js");

@@ -53,6 +53,7 @@ pub enum Error {
     NoQuorum = 4,
     AlreadyVoted = 5,
     InvalidQuorum = 6,
+    InvalidInput = 7,
 }
 
 /// Quorum-native attestation registry.
@@ -75,8 +76,10 @@ pub struct AttestationRegistry {
     trusted: Mapping<Address, bool>,
     attestation_count: Mapping<Address, u64>,
     attestations: Mapping<String, Attestation>,
-    // distinct-signer agreement count, keyed by "{request_id}#{output_hash}".
-    agreement: Mapping<String, u32>,
+    // distinct-signer agreement count, keyed by the structured pair (request_id, output_hash).
+    agreement: Mapping<(String, String), u32>,
+    // dedup guard: signers already counted toward a given (request_id, output_hash).
+    attested: Mapping<(String, String, Address), bool>,
     // winning output hash once quorum is reached, keyed by request_id.
     quorum_output: Mapping<String, String>,
     // one-vote-per-signer-per-request guard, keyed by (request_id, signer).
@@ -113,6 +116,11 @@ impl AttestationRegistry {
         if !self.trusted.get(&signer).unwrap_or(false) {
             self.env().revert(Error::NotTrusted);
         }
+        // Reject the separator so request_id/output_hash framings can never collide
+        // into one agreement cell (belt-and-suspenders over the structured tuple key).
+        if request_id.contains('#') || output_hash.contains('#') {
+            self.env().revert(Error::InvalidInput);
+        }
         let vote = (request_id.clone(), signer);
         if self.voted.get(&vote).unwrap_or(false) {
             self.env().revert(Error::AlreadyVoted);
@@ -134,9 +142,17 @@ impl AttestationRegistry {
         }
         self.attestation_count.add(&signer, 1);
 
-        let agree_key = agreement_key(&request_id, &output_hash);
-        let agreed = self.agreement.get(&agree_key).unwrap_or(0) + 1;
-        self.agreement.set(&agree_key, agreed);
+        // Count this signer toward the (request_id, output_hash) pair exactly once.
+        let pair = (request_id.clone(), output_hash.clone());
+        let signer_key = (request_id.clone(), output_hash.clone(), signer);
+        let agreed = if self.attested.get(&signer_key).unwrap_or(false) {
+            self.agreement.get(&pair).unwrap_or(0)
+        } else {
+            self.attested.set(&signer_key, true);
+            let n = self.agreement.get(&pair).unwrap_or(0) + 1;
+            self.agreement.set(&pair, n);
+            n
+        };
 
         self.env().emit_event(OutputAttested {
             request_id: request_id.clone(),
@@ -187,7 +203,7 @@ impl AttestationRegistry {
     /// How many distinct trusted signers have attested this exact output for this
     /// request (the live "k of n agree" figure).
     pub fn agreement_count(&self, request_id: String, output_hash: String) -> u32 {
-        self.agreement.get(&agreement_key(&request_id, &output_hash)).unwrap_or(0)
+        self.agreement.get(&(request_id, output_hash)).unwrap_or(0)
     }
 
     pub fn threshold(&self) -> u32 {
@@ -235,16 +251,6 @@ impl AttestationRegistry {
             self.env().revert(Error::NotOwner);
         }
     }
-}
-
-/// Composite dictionary key for the agreement tally. Both parts are hex/opaque
-/// tokens with no `#`, so the separator is unambiguous and reproducible off-chain.
-fn agreement_key(request_id: &str, output_hash: &str) -> String {
-    let mut key = String::with_capacity(request_id.len() + 1 + output_hash.len());
-    key.push_str(request_id);
-    key.push('#');
-    key.push_str(output_hash);
-    key
 }
 
 /// The registry as seen from another contract: a consumer cross-calls these in-VM.
@@ -499,6 +505,42 @@ mod tests {
         assert!(registry.quorum_of("req".into()).is_none());
         assert_eq!(registry.agreement_count("req".into(), "good".into()), 2);
         assert_eq!(registry.agreement_count("req".into(), "TAMPERED".into()), 1);
+    }
+
+    #[test]
+    fn c1_collision_framings_cannot_forge_quorum() {
+        // C1: one trusted signer must not forge a k-of-n quorum by exploiting an
+        // ambiguous "{request_id}#{output_hash}" agreement key. These three framings
+        // all collapsed to the same cell ("x#x#x#x") under the old key while passing
+        // the per-request `voted` guard (each has a distinct request_id).
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        registry.set_quorum(3);
+        let _ = registry.try_attest("x".into(), "x#x#x".into(), "m".into(), "p".into());
+        let _ = registry.try_attest("x#x".into(), "x#x".into(), "m".into(), "p".into());
+        let _ = registry.try_attest("x#x#x".into(), "x".into(), "m".into(), "p".into());
+
+        assert!(registry.quorum_of("x".into()).is_none());
+        assert!(registry.quorum_of("x#x".into()).is_none());
+        assert!(registry.quorum_of("x#x#x".into()).is_none());
+        assert_eq!(
+            registry.try_require_quorum("x#x#x".into(), "x".into()),
+            Err(Error::NoQuorum.into())
+        );
+    }
+
+    #[test]
+    fn c1_attest_rejects_separator_in_inputs() {
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        assert_eq!(
+            registry.try_attest("a#b".into(), "h".into(), "m".into(), "p".into()),
+            Err(Error::InvalidInput.into())
+        );
+        assert_eq!(
+            registry.try_attest("r".into(), "h#h".into(), "m".into(), "p".into()),
+            Err(Error::InvalidInput.into())
+        );
     }
 
     fn deploy_pair(env: &HostEnv) -> (AttestationRegistryHostRef, PayoutVaultHostRef) {

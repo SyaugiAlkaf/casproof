@@ -34,11 +34,16 @@ export default function AsciiHero() {
     >
       <ShieldBackground />
       <LegibilityScrim />
-      <div className="relative z-10 mx-auto flex w-full max-w-5xl flex-col items-center px-5 py-24 text-center sm:px-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col items-center px-5 py-24 text-center sm:px-8">
+        <div
+          aria-hidden
+          className="absolute inset-x-2 inset-y-10 -z-[1] rounded-[2rem] bg-ink-950/70 backdrop-blur-[6px] [mask-image:radial-gradient(120%_100%_at_50%_50%,#000_55%,transparent_100%)] sm:inset-x-6"
+        />
         <Wordmark />
         <Tagline />
         <TrustChips />
         <CtaRow />
+        <StatusLine />
       </div>
       <ScrollCue />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-ink-950 via-ink-950/70 to-transparent" />
@@ -64,15 +69,38 @@ function ScrollCue() {
 }
 
 function ShieldBackground() {
+  const mounted = useDeferredMount();
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 z-0">
       <div className="absolute left-1/2 top-1/2 h-[640px] w-[640px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint/[0.16] blur-[140px] sm:h-[820px] sm:w-[820px]" />
       <div className="absolute left-1/2 top-1/2 h-[280px] w-[280px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-mint-soft/[0.16] blur-[80px]" />
       <div className="absolute left-[38%] top-[44%] h-[360px] w-[360px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-cyan-400/[0.10] blur-[120px]" />
-      <AsciiShield />
+      <div
+        className={`absolute inset-0 transition-opacity duration-700 ${mounted ? "opacity-100" : "opacity-0"}`}
+      >
+        {mounted && <AsciiShield />}
+      </div>
       <CrtOverlay />
     </div>
   );
+}
+
+function useDeferredMount() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    type IdleWindow = Window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
+      cancelIdleCallback?: (handle: number) => void;
+    };
+    const w = window as IdleWindow;
+    if (w.requestIdleCallback) {
+      const id = w.requestIdleCallback(() => setMounted(true), { timeout: 600 });
+      return () => w.cancelIdleCallback?.(id);
+    }
+    const t = window.setTimeout(() => setMounted(true), 200);
+    return () => window.clearTimeout(t);
+  }, []);
+  return mounted;
 }
 
 function LegibilityScrim() {
@@ -82,7 +110,7 @@ function LegibilityScrim() {
       className="pointer-events-none absolute inset-0 z-[1]"
       style={{
         background:
-          "radial-gradient(120% 90% at 50% 42%, rgba(5,6,10,0.74) 0%, rgba(5,6,10,0.32) 38%, rgba(5,6,10,0.62) 100%)"
+          "radial-gradient(110% 80% at 50% 46%, rgba(5,6,10,0.86) 0%, rgba(5,6,10,0.5) 40%, rgba(5,6,10,0.7) 100%)"
       }}
     />
   );
@@ -217,13 +245,20 @@ function CtaRow() {
           <path d="M5 12h13M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </a>
-      <span className="inline-flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-300">
-        <span className="relative flex h-1.5 w-1.5">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
-          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
-        </span>
-        <span className="text-mint-soft">genuine → PAY</span> · <span className="text-signal-red">poisoned → REVERT</span>
+    </div>
+  );
+}
+
+function StatusLine() {
+  return (
+    <div className="mt-5 inline-flex items-center gap-2.5 rounded-full border border-white/10 bg-ink-900/70 px-4 py-2 font-mono text-[11px] uppercase tracking-[0.18em] text-slate-300 backdrop-blur-sm">
+      <span className="relative flex h-1.5 w-1.5">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
+        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
       </span>
+      <span className="font-semibold text-mint-soft">genuine → PAY</span>
+      <span className="text-slate-600" aria-hidden>·</span>
+      <span className="font-semibold text-signal-red">poisoned → REVERT</span>
     </div>
   );
 }

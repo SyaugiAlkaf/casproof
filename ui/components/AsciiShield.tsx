@@ -6,11 +6,11 @@ const RAMP = " .:-=+*#%@";
 const FONT_PX = 12;
 const CELL_W = FONT_PX * 0.62;
 const CELL_H = FONT_PX * 1.0;
-const FRAME_MS = 1000 / 35;
-const TARGET_COLS = 150;
+const FRAME_MS = 1000 / 24;
+const TARGET_COLS = 110;
 
-const GRID_U = 172;
-const GRID_V = 128;
+const GRID_U = 128;
+const GRID_V = 96;
 const SHIELD_HALF_W = 1.45;
 const SHIELD_TOP_Y = 1.0;
 const SHIELD_BOT_Y = -1.12;
@@ -256,21 +256,21 @@ export default function AsciiShield() {
           let color: string;
           let glow = 0;
           if (l > 0.84) {
-            color = "#ccfbf1";
-            glow = 9;
+            color = "#7fe7d4";
+            glow = 5;
           } else if (l > 0.62) {
-            color = "#5eead4";
-            glow = 6;
+            color = "#43c4ad";
+            glow = 3;
           } else if (l > 0.4) {
-            color = "#2dd4bf";
+            color = "#229e92";
           } else if (l > 0.2) {
-            color = "#218a8a";
+            color = "#1a6f6f";
           } else {
-            color = "#243046";
+            color = "#1d2638";
           }
 
           if (glow > 0) {
-            ctx.shadowColor = "rgba(45,212,191,0.6)";
+            ctx.shadowColor = "rgba(45,212,191,0.45)";
             ctx.shadowBlur = glow;
           }
           ctx.fillStyle = color;

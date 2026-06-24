@@ -1,7 +1,8 @@
 import Header from "@/components/Header";
 import HeroVerify from "@/components/HeroVerify";
-import PoisonDemo from "@/components/PoisonDemo";
 import QuorumContrast from "@/components/QuorumContrast";
+import WhatIsCasproof from "@/components/WhatIsCasproof";
+import IntegrationShowcase from "@/components/IntegrationShowcase";
 import HowItWorks from "@/components/HowItWorks";
 import CasperStack from "@/components/CasperStack";
 import AsciiHero from "@/components/AsciiHero";
@@ -24,34 +25,27 @@ export default function Page() {
       <main id="main" className="relative z-10 mx-auto max-w-6xl px-5 pb-24 pt-14 sm:px-8 sm:pt-20">
         <AsciiHero />
 
-        <div className="mb-14 max-w-3xl">
-          <p className="max-w-2xl text-pretty text-base leading-relaxed text-slate-300 sm:text-lg">
-            Casproof settles the verify decision and the value-bearing action in one atomic Casper VM call — so an
-            off-chain agent cannot skip the check. Others score agent trust off-chain; Casproof{" "}
-            <span className="font-medium text-slate-100">enforces it on-chain</span>, and the metered verify read is
-            paid for via <span className="font-medium text-mint-soft">x402</span>.
-          </p>
-          <p className="mt-4 max-w-2xl text-pretty text-[15px] leading-relaxed text-slate-400">
-            Demo it on an RWA payout: poison the feed and the release reverts — provably, in public.
-          </p>
-
-          <ul className="mt-7 flex flex-wrap gap-2.5" aria-label="What makes Casproof different">
-            <HeroChip>One atomic VM call</HeroChip>
-            <HeroChip>x402-metered verify</HeroChip>
-            <HeroChip>Pluggable attestation policy</HeroChip>
-            <HeroChip>RWA / DeFi payouts</HeroChip>
-          </ul>
-        </div>
-
-        <div className="space-y-6 scroll-mt-24" id="verify">
+        <div className="scroll-mt-24" id="verify">
           <HeroVerify />
-          <Reveal>
-            <QuorumContrast />
-          </Reveal>
-          <Reveal delay={60}>
-            <PoisonDemo />
-          </Reveal>
         </div>
+
+        <Reveal className="block scroll-mt-24" id="what">
+          <WhatIsCasproof />
+        </Reveal>
+
+        <Reveal className="mt-20 block scroll-mt-24" id="demo">
+          <div className="mb-6 flex items-center gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-400">
+              See it block a poisoned feed — live on testnet
+            </h2>
+            <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+          </div>
+          <QuorumContrast />
+        </Reveal>
+
+        <Reveal className="block">
+          <IntegrationShowcase />
+        </Reveal>
 
         <Reveal className="mt-20 block">
           <HowItWorks />
@@ -66,17 +60,6 @@ export default function Page() {
         <Footer />
       </Reveal>
     </div>
-  );
-}
-
-function HeroChip({ children }: { children: React.ReactNode }) {
-  return (
-    <li className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.03] px-3 py-1.5 text-[13px] text-slate-300">
-      <svg viewBox="0 0 24 24" fill="none" className="h-3.5 w-3.5 text-mint-soft" aria-hidden>
-        <path d="m5 12.5 4.2 4.3L19 7.2" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      {children}
-    </li>
   );
 }
 

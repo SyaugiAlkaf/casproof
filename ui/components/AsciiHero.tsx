@@ -40,8 +40,26 @@ export default function AsciiHero() {
         <TrustChips />
         <CtaRow />
       </div>
+      <ScrollCue />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-28 bg-gradient-to-t from-ink-950 via-ink-950/70 to-transparent" />
     </section>
+  );
+}
+
+function ScrollCue() {
+  return (
+    <a
+      href="#what"
+      aria-label="Scroll to learn what Casproof is"
+      className="absolute inset-x-0 bottom-5 z-20 mx-auto flex w-fit flex-col items-center gap-1.5 text-slate-400 transition hover:text-mint-soft focus-visible:text-mint-soft"
+    >
+      <span className="font-mono text-[10px] uppercase tracking-[0.3em]">scroll</span>
+      <span className="scroll-hint" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
+          <path d="m6 9 6 6 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </span>
+    </a>
   );
 }
 

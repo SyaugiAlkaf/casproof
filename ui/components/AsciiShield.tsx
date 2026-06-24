@@ -9,11 +9,11 @@ const CELL_H = FONT_PX * 1.0;
 const FRAME_MS = 1000 / 35;
 const TARGET_COLS = 150;
 
-const GRID_U = 132;
-const GRID_V = 168;
-const SHIELD_HALF_W = 0.86;
-const SHIELD_TOP_Y = 1.16;
-const SHIELD_BOT_Y = -1.28;
+const GRID_U = 172;
+const GRID_V = 128;
+const SHIELD_HALF_W = 1.45;
+const SHIELD_TOP_Y = 1.0;
+const SHIELD_BOT_Y = -1.12;
 const SHIELD_CY = (SHIELD_TOP_Y + SHIELD_BOT_Y) / 2;
 const SHIELD_HY = (SHIELD_TOP_Y - SHIELD_BOT_Y) / 2;
 
@@ -176,7 +176,7 @@ export default function AsciiShield() {
       rows = Math.max(28, Math.floor(height / CELL_H));
       cx = cols / 2;
       cy = rows / 2;
-      scale = Math.min(cols / 2.2, rows / 2.7);
+      scale = Math.min(cols / 3.2, rows / 2.4);
 
       lumBuf = new Float32Array(cols * rows);
       depthBuf = new Float32Array(cols * rows);

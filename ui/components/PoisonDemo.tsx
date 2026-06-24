@@ -169,12 +169,17 @@ function FeedPanel({
       ? "border-mint/40 shadow-glow"
       : "border-signal-red/40 shadow-redGlow";
 
+  const flourish = settled ? (attested ? "verdict-glow" : "verdict-shake") : "";
+
   return (
     <div
-      className={`relative overflow-hidden rounded-2xl border bg-ink-950/50 transition-all duration-500 ${frame}`}
+      className={`relative overflow-hidden rounded-2xl border bg-ink-950/50 transition-all duration-500 ${frame} ${flourish}`}
     >
       {state.loading && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-mint/10 to-transparent" />
+        <>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-12 bg-gradient-to-b from-mint/10 to-transparent" />
+          <div className={`scanline ${poisoned ? "scanline-red" : ""}`} aria-hidden />
+        </>
       )}
 
       <div className="flex items-center justify-between border-b border-white/6 px-5 py-3.5">
@@ -238,7 +243,7 @@ function Outcome({
     <div className="flex items-center justify-between gap-3 animate-[flip-in_0.4s_cubic-bezier(0.16,1,0.3,1)]">
       <div className="flex items-center gap-2.5">
         <span
-          className={`grid h-7 w-7 place-items-center rounded-lg ${
+          className={`verdict-pop grid h-7 w-7 place-items-center rounded-lg ${
             attested ? "bg-mint/15 text-mint" : "bg-signal-red/15 text-signal-red"
           }`}
         >

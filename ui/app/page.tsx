@@ -4,6 +4,8 @@ import PoisonDemo from "@/components/PoisonDemo";
 import QuorumContrast from "@/components/QuorumContrast";
 import HowItWorks from "@/components/HowItWorks";
 import CasperStack from "@/components/CasperStack";
+import FirewallHero from "@/components/FirewallHero";
+import Reveal from "@/components/Reveal";
 
 const REPO_URL = "https://github.com/SyaugiAlkaf/casproof";
 
@@ -56,20 +58,52 @@ export default function Page() {
           </ul>
         </section>
 
+        <FirewallHeroPanel />
+
         <div className="space-y-6 scroll-mt-24" id="verify">
           <HeroVerify />
-          <QuorumContrast />
-          <PoisonDemo />
+          <Reveal>
+            <QuorumContrast />
+          </Reveal>
+          <Reveal delay={60}>
+            <PoisonDemo />
+          </Reveal>
         </div>
 
-        <div className="mt-20">
+        <Reveal className="mt-20 block">
           <HowItWorks />
-        </div>
+        </Reveal>
 
-        <CasperStack />
+        <Reveal delay={60}>
+          <CasperStack />
+        </Reveal>
       </main>
 
-      <Footer />
+      <Reveal>
+        <Footer />
+      </Reveal>
+    </div>
+  );
+}
+
+function FirewallHeroPanel() {
+  return (
+    <div className="mb-14 overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-b from-ink-850/80 to-ink-900/80 shadow-card">
+      <div className="relative h-[200px] w-full sm:h-[240px]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(120%_120%_at_60%_50%,rgba(45,212,191,0.08)_0%,transparent_60%)]" />
+        <FirewallHero />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-ink-900/80 to-transparent" />
+      </div>
+      <div className="flex items-center justify-between gap-3 border-t border-white/[0.06] px-5 py-2.5 sm:px-6">
+        <span className="inline-flex items-center gap-2 text-[11px] font-medium uppercase tracking-[0.18em] text-slate-500">
+          <span className="relative flex h-1.5 w-1.5">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-mint opacity-60" />
+            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-mint" />
+          </span>
+          verify-before-act, live
+        </span>
+        <span className="font-mono text-[11px] text-slate-600">genuine → PAY · poisoned → REVERT</span>
+      </div>
     </div>
   );
 }
@@ -167,6 +201,13 @@ function Backdrop() {
         }}
       />
       <div className="absolute left-1/2 top-[-10%] h-[420px] w-[820px] -translate-x-1/2 rounded-full bg-mint/[0.07] blur-[120px]" />
+      <div
+        className="hex-backdrop absolute inset-0 opacity-[0.5]"
+        style={{
+          maskImage: "radial-gradient(120% 80% at 50% 30%, #000 0%, transparent 70%)",
+          WebkitMaskImage: "radial-gradient(120% 80% at 50% 30%, #000 0%, transparent 70%)"
+        }}
+      />
     </div>
   );
 }

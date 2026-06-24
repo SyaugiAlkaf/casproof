@@ -7,12 +7,13 @@ const HEX = "0123456789abcdef";
 const FONT_PX = 13;
 const CELL_W = FONT_PX * 0.92;
 const CELL_H = FONT_PX * 1.7;
-const FRAME_MS = 1000 / 12;
 const MAX_COLS = 120;
 const MAX_ROWS = 70;
-const SWAP_PER_FRAME = 0.014;
-const BASE_ALPHA = 0.06;
-const TWINKLE_ALPHA = 0.06;
+
+const ALPHA_TIERS = [0.05, 0.08, 0.11, 0.2];
+const TIER_N = ALPHA_TIERS.length;
+const DIM_COLOR = ALPHA_TIERS.map((a) => `rgba(45,212,191,${a})`);
+const BRIGHT_COLOR = `rgba(94,234,212,0.22)`;
 
 function pickGlyph(): string {
   if (Math.random() < 0.16) return HEX[(Math.random() * HEX.length) | 0];
@@ -57,42 +58,16 @@ function FieldCanvas() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
     let width = 0;
     let height = 0;
     let cols = 0;
     let rows = 0;
-    let stepX = CELL_W;
-    let stepY = CELL_H;
-    let glyphs = new Uint8Array(0);
-    let phase = new Float32Array(0);
-    let bright = new Uint8Array(0);
 
-    let raf = 0;
-    let last = 0;
-    let running = false;
-    let t0 = performance.now();
-
+    const all = GLYPHS + HEX;
     const fontFor = (px: number) => `${px}px "JetBrains Mono", ui-monospace, SFMono-Regular, monospace`;
 
-    const seed = () => {
-      glyphs = new Uint8Array(cols * rows);
-      phase = new Float32Array(cols * rows);
-      bright = new Uint8Array(cols * rows);
-      const all = GLYPHS + HEX;
-      for (let i = 0; i < glyphs.length; i++) {
-        const g = pickGlyph();
-        glyphs[i] = all.indexOf(g);
-        phase[i] = Math.random() * Math.PI * 2;
-        bright[i] = Math.random() < 0.05 ? 1 : 0;
-      }
-    };
-
-    const charAt = (code: number) => (GLYPHS + HEX)[code] ?? "·";
-
-    const resize = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    const render = () => {
+      const dpr = 1;
       width = Math.max(1, window.innerWidth);
       height = Math.max(1, window.innerHeight);
       canvas.width = Math.round(width * dpr);
@@ -102,92 +77,56 @@ function FieldCanvas() {
       ctx.textAlign = "center";
       cols = Math.min(MAX_COLS, Math.ceil(width / CELL_W) + 1);
       rows = Math.min(MAX_ROWS, Math.ceil(height / CELL_H) + 1);
-      stepX = width / cols;
-      stepY = height / rows;
-      seed();
-    };
+      const stepX = width / cols;
+      const stepY = height / rows;
 
-    const draw = (now: number) => {
       ctx.clearRect(0, 0, width, height);
       ctx.font = fontFor(FONT_PX);
-      const t = (now - t0) / 1000;
 
+      const dim: string[][] = Array.from({ length: TIER_N }, () => []);
+      const brightCells: string[] = [];
       for (let r = 0; r < rows; r++) {
         const y = r * stepY + stepY / 2;
         for (let c = 0; c < cols; c++) {
-          const cell = r * cols + c;
-          const tw = 0.5 + 0.5 * Math.sin(t * 0.7 + phase[cell]);
-          const isBright = bright[cell] === 1;
-          const a = BASE_ALPHA + tw * TWINKLE_ALPHA + (isBright ? 0.14 : 0);
+          const g = all[(Math.random() * all.length) | 0];
+          if (g === "·" && Math.random() < 0.45) continue;
           const x = c * stepX + stepX / 2;
-          ctx.fillStyle = isBright
-            ? `rgba(94,234,212,${a.toFixed(3)})`
-            : `rgba(45,212,191,${a.toFixed(3)})`;
-          ctx.fillText(charAt(glyphs[cell]), x, y);
+          if (Math.random() < 0.04) {
+            brightCells.push(g, `${x}`, `${y}`);
+          } else {
+            const tier = (Math.random() * TIER_N) | 0;
+            dim[tier].push(g, `${x}`, `${y}`);
+          }
         }
       }
-    };
 
-    const mutate = () => {
-      const all = GLYPHS + HEX;
-      const swaps = (glyphs.length * SWAP_PER_FRAME) | 0;
-      for (let i = 0; i < swaps; i++) {
-        const idx = (Math.random() * glyphs.length) | 0;
-        glyphs[idx] = all.indexOf(pickGlyph());
-        if (Math.random() < 0.08) bright[idx] = bright[idx] ? 0 : 1;
+      for (let t = 0; t < TIER_N; t++) {
+        const b = dim[t];
+        if (b.length === 0) continue;
+        ctx.fillStyle = DIM_COLOR[t];
+        for (let k = 0; k < b.length; k += 3) {
+          ctx.fillText(b[k], +b[k + 1], +b[k + 2]);
+        }
       }
-    };
-
-    const step = (now: number) => {
-      if (!running) return;
-      raf = requestAnimationFrame(step);
-      if (now - last < FRAME_MS) return;
-      last = now;
-      mutate();
-      draw(now);
-    };
-
-    const start = () => {
-      if (reduce || running || document.hidden) return;
-      running = true;
-      last = performance.now();
-      raf = requestAnimationFrame(step);
-    };
-
-    const stop = () => {
-      running = false;
-      if (raf) cancelAnimationFrame(raf);
-      raf = 0;
-    };
-
-    const onVisibility = () => {
-      if (document.hidden) stop();
-      else start();
+      if (brightCells.length > 0) {
+        ctx.fillStyle = BRIGHT_COLOR;
+        for (let k = 0; k < brightCells.length; k += 3) {
+          ctx.fillText(brightCells[k], +brightCells[k + 1], +brightCells[k + 2]);
+        }
+      }
     };
 
     let resizeTimer = 0;
     const onResize = () => {
       window.clearTimeout(resizeTimer);
-      resizeTimer = window.setTimeout(() => {
-        resize();
-        if (reduce) draw(performance.now());
-      }, 150);
+      resizeTimer = window.setTimeout(render, 200);
     };
 
-    resize();
-
-    if (reduce) {
-      draw(performance.now());
-    } else {
-      start();
-      document.addEventListener("visibilitychange", onVisibility);
-      window.addEventListener("resize", onResize);
-    }
+    render();
+    window.addEventListener("resize", onResize);
 
     return () => {
-      stop();
       window.clearTimeout(resizeTimer);
-      document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("resize", onResize);
     };
   }, []);
@@ -196,7 +135,7 @@ function FieldCanvas() {
     <canvas
       ref={canvasRef}
       aria-hidden="true"
-      className="pointer-events-none fixed inset-0 -z-10 h-full w-full"
+      className="field-breathe pointer-events-none fixed inset-0 -z-10 h-full w-full"
     />
   );
 }

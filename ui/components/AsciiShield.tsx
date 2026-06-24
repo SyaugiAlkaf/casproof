@@ -6,8 +6,23 @@ const RAMP = " .:-=+*#%@";
 const FONT_PX = 12;
 const CELL_W = FONT_PX * 0.62;
 const CELL_H = FONT_PX * 1.0;
-const FRAME_MS = 1000 / 24;
+const FRAME_MS = 1000 / 20;
 const TARGET_COLS = 110;
+
+const TIER_COLORS = ["#1d2638", "#1a6f6f", "#229e92", "#43c4ad", "#7fe7d4"];
+const TIER_MIN = [0, 0.2, 0.4, 0.62, 0.84];
+const TIER_N = TIER_COLORS.length;
+
+function tierOf(l: number): number {
+  let t = 0;
+  for (let k = TIER_N - 1; k >= 0; k--) {
+    if (l >= TIER_MIN[k]) {
+      t = k;
+      break;
+    }
+  }
+  return t;
+}
 
 const GRID_U = 128;
 const GRID_V = 96;
@@ -144,6 +159,7 @@ export default function AsciiShield() {
     let lumBuf = new Float32Array(0);
     let depthBuf = new Float32Array(0);
     let onBuf = new Uint8Array(0);
+    const tierCells: number[][] = Array.from({ length: TIER_N }, () => []);
 
     let raf = 0;
     let last = 0;
@@ -163,7 +179,7 @@ export default function AsciiShield() {
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const dpr = 1;
       width = Math.max(1, rect.width);
       height = Math.max(1, rect.height);
       canvas.width = Math.round(width * dpr);
@@ -239,43 +255,31 @@ export default function AsciiShield() {
       ctx.font = fontFor(FONT_PX);
       const rampMax = RAMP.length - 1;
 
+      for (let t = 0; t < TIER_N; t++) tierCells[t].length = 0;
+
       for (let r = 0; r < rows; r++) {
         for (let c = 0; c < cols; c++) {
           const cell = r * cols + c;
           if (!onBuf[cell]) continue;
           const l = lumBuf[cell];
-          if (l <= 0.001) continue;
+          if (l <= 0.02) continue;
+          tierCells[tierOf(l)].push(cell);
+        }
+      }
 
+      for (let t = 0; t < TIER_N; t++) {
+        const bucket = tierCells[t];
+        if (bucket.length === 0) continue;
+        ctx.fillStyle = TIER_COLORS[t];
+        for (let k = 0; k < bucket.length; k++) {
+          const cell = bucket[k];
+          const l = lumBuf[cell];
           const ri = Math.min(rampMax, Math.max(0, Math.round(l * rampMax)));
           const ch = RAMP[ri];
           if (ch === " ") continue;
-
-          const x = ox + c * CELL_W;
-          const y = oy + r * CELL_H;
-
-          let color: string;
-          let glow = 0;
-          if (l > 0.84) {
-            color = "#7fe7d4";
-            glow = 5;
-          } else if (l > 0.62) {
-            color = "#43c4ad";
-            glow = 3;
-          } else if (l > 0.4) {
-            color = "#229e92";
-          } else if (l > 0.2) {
-            color = "#1a6f6f";
-          } else {
-            color = "#1d2638";
-          }
-
-          if (glow > 0) {
-            ctx.shadowColor = "rgba(45,212,191,0.45)";
-            ctx.shadowBlur = glow;
-          }
-          ctx.fillStyle = color;
-          ctx.fillText(ch, x, y);
-          if (glow > 0) ctx.shadowBlur = 0;
+          const c = cell % cols;
+          const r = (cell - c) / cols;
+          ctx.fillText(ch, ox + c * CELL_W, oy + r * CELL_H);
         }
       }
     };
@@ -375,5 +379,12 @@ export default function AsciiShield() {
     };
   }, []);
 
-  return <canvas ref={canvasRef} aria-hidden="true" className="block h-full w-full" />;
+  return (
+    <canvas
+      ref={canvasRef}
+      aria-hidden="true"
+      className="block h-full w-full"
+      style={{ filter: "drop-shadow(0 0 6px rgba(45,212,191,0.35))" }}
+    />
+  );
 }

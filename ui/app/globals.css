@@ -283,6 +283,20 @@ body {
   animation: hex-drift 18s linear infinite;
 }
 
+@keyframes field-breathe {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.field-breathe {
+  animation: field-breathe 9s ease-in-out infinite;
+}
+
 .ascii-wordmark {
   text-shadow: 0 0 22px rgba(45, 212, 191, 0.4), 0 0 48px rgba(34, 211, 238, 0.18);
 }

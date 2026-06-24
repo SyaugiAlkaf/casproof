@@ -95,6 +95,9 @@ pub struct AttestationRegistry {
     voted: Mapping<(String, Address), bool>,
     // slash count per signer; subtracted from standing so lying cannot pay off.
     slashes: Mapping<Address, u64>,
+    // permanent disqualification: a slashed signer never counts toward quorum again,
+    // even if re-trusted — slashing is sticky for the gate.
+    slashed: Mapping<Address, bool>,
 }
 
 #[odra::module]
@@ -226,7 +229,9 @@ impl AttestationRegistry {
                     if let Some(signer) =
                         self.agree_signers.get(&(request_id.clone(), output_hash.clone(), i))
                     {
-                        if self.trusted.get(&signer).unwrap_or(false) {
+                        if self.trusted.get(&signer).unwrap_or(false)
+                            && !self.slashed.get(&signer).unwrap_or(false)
+                        {
                             still_trusted += 1;
                             if lead.is_none() {
                                 lead = Some(signer);
@@ -279,6 +284,7 @@ impl AttestationRegistry {
         self.assert_owner();
         self.slashes.add(&signer, 1);
         self.trusted.set(&signer, false);
+        self.slashed.set(&signer, true);
         self.env().emit_event(SignerSlashed { signer });
     }
 
@@ -836,5 +842,40 @@ mod tests {
         env.set_caller(s2);
         registry.attest("req2".into(), "g".into(), "b".into(), "p".into());
         assert_eq!(registry.quorum_of("req2".into()), Some("g".into()));
+    }
+
+    #[test]
+    fn slash_is_sticky_retrust_cannot_revive_quorum() {
+        // Slashing must be permanent for the gate: re-trusting a slashed signer must NOT
+        // revive a quorum it backed. A slashed address never counts toward the live
+        // still-trusted re-count, even if set_trusted re-flips its trust flag.
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        let s3 = env.get_account(2);
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s3);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+
+        env.set_caller(env.get_account(0));
+        assert_eq!(registry.require_quorum("req".into(), "h".into()), s2);
+        registry.slash(s2);
+        registry.slash(s3);
+        assert_eq!(
+            registry.try_require_quorum("req".into(), "h".into()),
+            Err(Error::NoQuorum.into())
+        );
+
+        // owner re-trusts the slashed signers — the gate must STILL revert
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+        assert_eq!(
+            registry.try_require_quorum("req".into(), "h".into()),
+            Err(Error::NoQuorum.into())
+        );
     }
 }

@@ -173,6 +173,8 @@ Two liveness guarantees back it: a value-bearing consumer can compose `require_f
 
 This is owner-adjudicated optimistic verification today. Trustless resolution — a TEE/zkML recompute that adjudicates a challenge without an owner — is the roadmap; the challenge primitive is the slot it plugs into.
 
+> The challenge window and the three additional consumers ship in the contract and are covered by the test suite; the [live testnet registry](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) above runs the Phase-1 hardened gate (the PAY/REVERT demo). Redeploy with the Quickstart to put the challenge window and consumers on-chain.
+
 
 ## Components
 

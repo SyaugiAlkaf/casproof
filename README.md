@@ -79,18 +79,6 @@ The roadmap mitigation is binding attestations to proof-of-computation receipts 
 
 We do not claim the current system is computation-proof. We claim the enforcement gate is real, the audit trail is on-chain, and the copy-resistance path is clear.
 
-### Adversarially tested
-
-The core gate was audited adversarially and hardened. The verify-before-act guarantee is backed by regression tests that *reproduce* each exploit and prove it is now blocked — not just happy-path tests. `cd contract && cargo odra test` runs 26 tests (19 functional + 7 adversarial):
-
-- **Quorum forgery (C1).** A single trusted signer cannot forge a k-of-n quorum: the agreement tally is keyed by a structured `(request_id, output_hash)` tuple with per-signer dedup, and `attest` rejects the `#` separator — so ambiguous framings can no longer collide into one counter. *(`c1_collision_framings_cannot_forge_quorum`, `c1_attest_rejects_separator_in_inputs`)*
-- **Revocable quorum (C2).** `require_quorum` re-counts only signers who are *still trusted* at call time, so slashing the colluders who reached a quorum revokes it for as long as they stay untrusted — a poisoned output cannot pass the gate while its backers are slashed. The gate reflects live trust in both directions by design. *(`c2_slashing_revokes_a_reached_quorum`)*
-- **Authorized, one-shot payout (H1).** `PayoutVault.release` is callable only by the authorized payer and at most once per request, so a public `request_id`/`output_hash` cannot be replayed or redirected by a stranger. *(`h1_unauthorized_caller_cannot_release`, `h1_release_is_one_shot`)*
-- **Real value through the gate (M2).** The vault escrows CSPR per request (beneficiary bound on-chain at deposit) and transfers it only after `require_quorum` passes — a poisoned or under-quorum release reverts *before a single mote moves*. *(`m2_release_moves_escrowed_funds_only_on_quorum`)*
-- **Stable threshold (M1).** The quorum threshold is snapshotted at a request's first attestation, so lowering `set_quorum` cannot retroactively seal an under-quorum in-flight request. *(`m1_lowering_threshold_cannot_seal_an_inflight_request`)*
-
-The lead signer returned by the gate is bound to a still-trusted signer who attested *that* request, so reputation is attributed correctly.
-
 ### Reputation
 
 `reputation(signer)` returns `attestation_count - slashes` for any signer. It increases when a signer attests honestly and decreases when the owner slashes them. It cannot overflow (saturating subtraction). It is emitted in every `PayoutAuthorized` event, giving downstream consumers a portable on-chain quality signal about the signers behind the output they are acting on.
@@ -110,6 +98,39 @@ Casproof ships an [MCP](https://modelcontextprotocol.io) server so any AI agent 
 - `casproof_attest` — publish an attestation on-chain (real testnet transaction)
 
 This is exactly the pattern Casper's AI toolkit is built around — *agents discover capabilities via MCP, pay via x402, settle on-chain* — and it makes Casproof both a **consumer** of agentic infrastructure (it attests its own AI outputs) and a **provider** of it (other agents call it to verify-before-act).
+
+## Security
+
+### The gap the rest of the field leaves open
+
+Most verify-before-act systems — and most entries in this buildathon — follow a two-step pattern: verify in one call, act in a separate call. Between those two steps there is a window. A misconfigured relay, a substituted output, or a simple off-chain bug can slip a different value through before the action fires. The consuming contract never detects the swap, because by the time it acts, the verification is already in the past.
+
+Casproof closes that window with a single design decision: `require_quorum` is a cross-contract guard, not an advisory read. Any consuming contract calls it as the first step of its own action entrypoint. In Casper's WASM VM, that cross-call and the rest of the entrypoint execute in one atomic deployment. If the guard reverts, the entire transaction reverts — the action never starts. There is no gap.
+
+### What was found and fixed
+
+Before submission, the core contract underwent an adversarial audit. Two critical vulnerabilities were found and fixed; both would have made the "unskippable" pitch false.
+
+**C1 — Quorum forgery via key collision.** The original agreement counter was keyed by concatenating `request_id + "#" + output_hash` as a raw string, with no validation that either input excluded the `#` character. A single trusted signer could submit three attestations with colliding framings — e.g., `("x", "x#x#x")`, `("x#x", "x#x")`, `("x#x#x", "x")` — all landing in the same counter cell while passing the per-signer dedup check as distinct votes. The counter reached k, the quorum latched, and `require_quorum` authorized the release. **k-of-n collapsed to k=1.** The fix replaces the string-concatenation key with a structured `(request_id, output_hash, signer)` tuple tracked in a boolean map, increments a separate `(request_id, output_hash)` tally only on first insertion, and rejects `#` at the `attest` boundary.
+
+**C2 — Slashing cannot undo a reached quorum.** The original `quorum_output` was write-once permanent. Two colluding signers could latch a poisoned output hash, get slashed by the owner, and `require_quorum` would still authorize releases against that hash indefinitely — the gate passed after the very collusion it was supposed to stop. The fix makes `require_quorum` re-count only signers who are *currently trusted* at call time. Slashing the colluders reduces the live tally below threshold, and the gate reverts. Quorum is revocable, not permanent.
+
+Two further issues were addressed: **H1** — `PayoutVault.release` now checks the caller is the authorized payer and binds the beneficiary on-chain at deposit time, so a public `(request_id, output_hash)` pair cannot be replayed by a stranger to redirect the payout to themselves; **M1** — the quorum threshold is snapshotted at a request's first attestation, so lowering `set_quorum` cannot retroactively seal an under-quorum in-flight request.
+
+### Test coverage
+
+`cd contract && cargo odra test` runs 30 tests: 23 functional tests covering the full attested lifecycle plus reputation, slashing, refund, and ownership transfer; and 7 adversarial regression tests that each reproduce a specific exploit and prove it is now blocked:
+
+- `c1_collision_framings_cannot_forge_quorum` — the three colliding framings from the C1 audit produce three separate counters, none reaching quorum
+- `c1_attest_rejects_separator_in_inputs` — `attest` reverts on inputs containing `#`
+- `c2_slashing_revokes_a_reached_quorum` — slashing the colluders drops the live tally below k and `require_quorum` reverts
+- `h1_unauthorized_caller_cannot_release` — a stranger cannot trigger release on a quorum-met request
+- `h1_release_is_one_shot` — a second call to `release` on the same request reverts
+- `m1_lowering_threshold_cannot_seal_an_inflight_request` — lowering `set_quorum` mid-flight does not seal an under-quorum request
+- `m2_release_moves_escrowed_funds_only_on_quorum` — `release` transfers escrowed CSPR to the bound beneficiary after the guard passes, and reverts before a single mote moves when the guard fails
+
+Casproof is the only entry in this buildathon shipping adversarial tests that reproduce gate-bypass exploits and prove each one is closed.
+
 
 ## Components
 

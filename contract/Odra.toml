@@ -9,3 +9,6 @@ fqn = "casproof_contract::OutcomeEscrow"
 
 [[contracts]]
 fqn = "casproof_contract::RWAValuationGate"
+
+[[contracts]]
+fqn = "casproof_contract::OracleGatedSwap"

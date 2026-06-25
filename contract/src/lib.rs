@@ -599,6 +599,67 @@ impl RWAValuationGate {
     }
 }
 
+#[odra::event]
+pub struct SwapExecuted {
+    pub request_id: String,
+    pub price_hash: String,
+    pub token_in: String,
+    pub token_out: String,
+    pub amount_in: U512,
+    pub min_out: U512,
+    pub signer: Address,
+}
+
+/// A DeFi action gated on a quorum-attested price feed: the swap executes ONLY when the
+/// reference price is the quorum-attested result. `swap` cross-calls require_quorum first, so
+/// an unverified or substituted price reverts before the action runs — proving the guard
+/// gates a non-payout action, not just payouts (the generic-primitive capstone).
+#[odra::module(events = [SwapExecuted])]
+pub struct OracleGatedSwap {
+    registry: External<RegistryContractRef>,
+    authorized: Var<Address>,
+    executed: Mapping<String, bool>,
+}
+
+#[odra::module]
+impl OracleGatedSwap {
+    pub fn init(&mut self, registry: Address, authorized: Address) {
+        self.registry.set(registry);
+        self.authorized.set(authorized);
+    }
+
+    /// Execute the swap only when `price_hash` is the quorum-attested feed for `request_id`.
+    /// Authorized-only, one-shot per request.
+    pub fn swap(
+        &mut self,
+        request_id: String,
+        price_hash: String,
+        token_in: String,
+        token_out: String,
+        amount_in: U512,
+        min_out: U512,
+    ) -> Address {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
+        let signer = self.registry.require_quorum(request_id.clone(), price_hash.clone());
+        if self.executed.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        self.executed.set(&request_id, true);
+        self.env().emit_event(SwapExecuted {
+            request_id,
+            price_hash,
+            token_in,
+            token_out,
+            amount_in,
+            min_out,
+            signer,
+        });
+        signer
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1395,5 +1456,111 @@ mod tests {
             Err(Error::AlreadyReleased.into())
         );
         assert_eq!(gate.valuation_of("A1".into()), Some(v));
+    }
+
+    fn deploy_swap(env: &HostEnv) -> (AttestationRegistryHostRef, OracleGatedSwapHostRef) {
+        let registry = AttestationRegistry::deploy(env, NoArgs);
+        let swap = OracleGatedSwap::deploy(
+            env,
+            OracleGatedSwapInitArgs { registry: registry.address(), authorized: env.get_account(0) },
+        );
+        (registry, swap)
+    }
+
+    #[test]
+    fn swap_executes_when_price_quorum_met() {
+        let env = odra_test::env();
+        let (mut registry, mut swap) = deploy_swap(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "ph".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "ph".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(
+            swap.swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            env.get_account(0)
+        );
+    }
+
+    #[test]
+    fn swap_reverts_without_quorum() {
+        let env = odra_test::env();
+        let (mut registry, mut swap) = deploy_swap(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "ph".into(), "a".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(
+            swap.try_swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            Err(Error::NoQuorum.into())
+        );
+        // even after quorum is reached, a SUBSTITUTED price hash reverts
+        env.set_caller(s2);
+        registry.attest("req".into(), "ph".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(
+            swap.try_swap("req".into(), "SUBST".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            Err(Error::NoQuorum.into())
+        );
+    }
+
+    #[test]
+    fn swap_blocked_after_signers_slashed() {
+        let env = odra_test::env();
+        let (mut registry, mut swap) = deploy_swap(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        let s3 = env.get_account(2);
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+        env.set_caller(s2);
+        registry.attest("req".into(), "ph".into(), "a".into(), "p".into());
+        env.set_caller(s3);
+        registry.attest("req".into(), "ph".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        registry.slash(s2);
+        registry.slash(s3);
+        assert_eq!(
+            swap.try_swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            Err(Error::NoQuorum.into())
+        );
+    }
+
+    #[test]
+    fn unauthorized_caller_cannot_swap() {
+        let env = odra_test::env();
+        let (mut registry, mut swap) = deploy_swap(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "ph".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "ph".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(5));
+        assert_eq!(
+            swap.try_swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            Err(Error::NotAuthorized.into())
+        );
+    }
+
+    #[test]
+    fn swap_is_one_shot() {
+        let env = odra_test::env();
+        let (mut registry, mut swap) = deploy_swap(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "ph".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "ph".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert!(swap.try_swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)).is_ok());
+        assert_eq!(
+            swap.try_swap("req".into(), "ph".into(), "USDC".into(), "CSPR".into(), U512::from(1000u64), U512::from(900u64)),
+            Err(Error::AlreadyReleased.into())
+        );
     }
 }

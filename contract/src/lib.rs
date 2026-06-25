@@ -140,6 +140,9 @@ pub struct AttestationRegistry {
     challenger: Mapping<String, Address>,
     counter_hash: Mapping<String, String>,
     challenge_bond: Mapping<String, U512>,
+    // block time a challenge was opened — bounds owner resolution; after challenge_window
+    // anyone may finalize a stale challenge so it can never freeze a payout forever.
+    challenge_time: Mapping<String, u64>,
 }
 
 #[odra::module]
@@ -300,6 +303,20 @@ impl AttestationRegistry {
         }
     }
 
+    /// Like `require_quorum`, but also requires the fraud-proof challenge window to have fully
+    /// elapsed with no challenge pending — so a value-bearing consumer that composes this guard
+    /// waits out the window and cannot be front-run by a fraudulent quorum that is challenged
+    /// and revoked moments later. Reverts `ChallengePending` while still in-window. (`require_quorum`
+    /// stays optimistic/immediate; consumers choose the guarantee they need.)
+    pub fn require_final_quorum(&self, request_id: String, output_hash: String) -> Address {
+        let deadline = self.quorum_time.get(&request_id).unwrap_or(0)
+            + self.challenge_window.get().unwrap_or(0);
+        if self.env().get_block_time() < deadline {
+            self.env().revert(Error::ChallengePending);
+        }
+        self.require_quorum(request_id, output_hash)
+    }
+
     /// How many distinct trusted signers have attested this exact output for this
     /// request (the live "k of n agree" figure).
     pub fn agreement_count(&self, request_id: String, output_hash: String) -> u32 {
@@ -360,6 +377,10 @@ impl AttestationRegistry {
     /// consumer can act on a contested output until the owner resolves it.
     #[odra(payable)]
     pub fn challenge(&mut self, request_id: String, counter_hash: String) {
+        let window = self.challenge_window.get().unwrap_or(0);
+        if window == 0 {
+            self.env().revert(Error::ChallengeWindowClosed);
+        }
         let winner = match self.quorum_output.get(&request_id) {
             Some(w) => w,
             None => self.env().revert(Error::NoQuorum),
@@ -373,15 +394,15 @@ impl AttestationRegistry {
         if counter_hash == winner || counter_hash.contains('#') {
             self.env().revert(Error::InvalidInput);
         }
-        let deadline = self.quorum_time.get(&request_id).unwrap_or(0)
-            + self.challenge_window.get().unwrap_or(0);
-        if self.env().get_block_time() > deadline {
+        let now = self.env().get_block_time();
+        if now > self.quorum_time.get(&request_id).unwrap_or(0) + window {
             self.env().revert(Error::ChallengeWindowClosed);
         }
         let challenger = self.env().caller();
         self.challenged.set(&request_id, true);
         self.challenger.set(&request_id, challenger);
         self.counter_hash.set(&request_id, counter_hash.clone());
+        self.challenge_time.set(&request_id, now);
         let prior = self.challenge_bond.get(&request_id).unwrap_or_default();
         self.challenge_bond.set(&request_id, prior + self.env().attached_value());
         self.env().emit_event(ChallengeOpened { request_id, challenger, counter_hash });
@@ -389,8 +410,10 @@ impl AttestationRegistry {
 
     /// Owner-only: resolve an open challenge. `uphold = true` declares the quorum fraudulent —
     /// every agreeing signer is slashed, the quorum is permanently revoked, and the bond is
-    /// returned to the challenger. `uphold = false` rejects it — the quorum stands and the
-    /// bond is forfeited to the owner.
+    /// returned to the challenger. `uphold = false` rejects it — the quorum stands and the bond
+    /// is forfeited (kept in the vault, never paid to the owner, so the adjudicator has no
+    /// pecuniary motive to reject a legitimate fraud-proof). State is finalized before any
+    /// transfer (checks-effects-interactions).
     pub fn resolve_challenge(&mut self, request_id: String, uphold: bool) {
         self.assert_owner();
         if !self.challenged.get(&request_id).unwrap_or(false) {
@@ -398,6 +421,7 @@ impl AttestationRegistry {
         }
         let bond = self.challenge_bond.get(&request_id).unwrap_or_default();
         self.challenge_bond.set(&request_id, U512::zero());
+        self.challenged.set(&request_id, false);
         if uphold {
             let winner = self.quorum_output.get(&request_id).unwrap_or_revert(&self.env());
             let pair = (request_id.clone(), winner.clone());
@@ -416,16 +440,33 @@ impl AttestationRegistry {
             if bond > U512::zero() {
                 self.env().transfer_tokens(&challenger, &bond);
             }
-            self.challenged.set(&request_id, false);
             self.env().emit_event(ChallengeUpheld { request_id, revoked_hash: winner });
         } else {
-            let owner = self.owner.get().unwrap_or_revert(&self.env());
-            if bond > U512::zero() {
-                self.env().transfer_tokens(&owner, &bond);
-            }
-            self.challenged.set(&request_id, false);
             self.env().emit_event(ChallengeRejected { request_id });
         }
+    }
+
+    /// Permissionless self-heal: if the owner does not resolve a challenge within `challenge_window`
+    /// after it was opened, anyone may finalize it — the challenge is dropped (the quorum stands),
+    /// the bond is returned to the challenger, and `require_quorum` unfreezes. Guarantees no
+    /// challenge — and no renounced or absent owner — can freeze a payout forever.
+    pub fn finalize_stale_challenge(&mut self, request_id: String) {
+        if !self.challenged.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::NotChallenged);
+        }
+        let deadline = self.challenge_time.get(&request_id).unwrap_or(0)
+            + self.challenge_window.get().unwrap_or(0);
+        if self.env().get_block_time() <= deadline {
+            self.env().revert(Error::ChallengePending);
+        }
+        let bond = self.challenge_bond.get(&request_id).unwrap_or_default();
+        self.challenge_bond.set(&request_id, U512::zero());
+        self.challenged.set(&request_id, false);
+        let challenger = self.challenger.get(&request_id).unwrap_or_revert(&self.env());
+        if bond > U512::zero() {
+            self.env().transfer_tokens(&challenger, &bond);
+        }
+        self.env().emit_event(ChallengeRejected { request_id });
     }
 
     /// Whether a request's quorum has been permanently revoked by an upheld challenge.
@@ -446,6 +487,9 @@ impl AttestationRegistry {
     /// single key can later re-curate the panel or forge a quorum.
     pub fn renounce_ownership(&mut self) {
         self.assert_owner();
+        // Disable new challenges: with no owner to adjudicate, an open challenge could only be
+        // cleared by finalize_stale_challenge — so we stop new ones rather than rely on that.
+        self.challenge_window.set(0);
         self.renounced.set(true);
     }
 
@@ -471,6 +515,7 @@ pub trait Registry {
     fn verify(&self, output_hash: String) -> Option<Attestation>;
     fn quorum_of(&self, request_id: String) -> Option<String>;
     fn require_quorum(&self, request_id: String, output_hash: String) -> Address;
+    fn require_final_quorum(&self, request_id: String, output_hash: String) -> Address;
     fn reputation(&self, signer: Address) -> u64;
 }
 
@@ -714,7 +759,11 @@ impl RWAValuationGate {
             Ok(b) => b,
             Err(_) => self.env().revert(Error::InvalidInput),
         };
-        let mut pre = asset_id.into_bytes();
+        // Length-prefix the asset_id so the (asset_id, valuation) -> bytes mapping is
+        // injective (no byte can shift across the boundary to collide distinct pairs).
+        let asset_bytes = asset_id.into_bytes();
+        let mut pre = (asset_bytes.len() as u32).to_le_bytes().to_vec();
+        pre.extend_from_slice(&asset_bytes);
         pre.extend_from_slice(&value_bytes);
         to_hex(&self.env().hash(pre))
     }
@@ -1930,5 +1979,58 @@ mod tests {
         registry.resolve_challenge("req".into(), true);
         assert!(registry.is_revoked("req".into()));
         assert_eq!(env.balance_of(&challenger2), before2);
+    }
+
+    #[test]
+    fn require_final_quorum_waits_out_the_window() {
+        let env = odra_test::env();
+        let (registry, _s2) = registry_with_quorum(&env, 1000);
+        // in-window: the maturity guard reverts even though quorum is reached
+        assert_eq!(
+            registry.try_require_final_quorum("req".into(), "h".into()),
+            Err(Error::ChallengePending.into())
+        );
+        // after the window elapses: it passes
+        env.advance_block_time(2000);
+        assert_eq!(registry.require_final_quorum("req".into(), "h".into()), env.get_account(0));
+    }
+
+    #[test]
+    fn stale_challenge_can_be_finalized_by_anyone() {
+        let env = odra_test::env();
+        let (mut registry, _s2) = registry_with_quorum(&env, 1000);
+        let challenger = env.get_account(3);
+        let bond = U512::from(100_000_000u64);
+        let before = env.balance_of(&challenger);
+        env.set_caller(challenger);
+        registry.with_tokens(bond).challenge("req".into(), "counter".into());
+        assert_eq!(
+            registry.try_require_quorum("req".into(), "h".into()),
+            Err(Error::ChallengePending.into())
+        );
+        // owner never resolves; after the window anyone finalizes -> unfreezes, bond refunded
+        env.advance_block_time(5000);
+        env.set_caller(env.get_account(7));
+        registry.finalize_stale_challenge("req".into());
+        assert_eq!(registry.require_quorum("req".into(), "h".into()), env.get_account(0));
+        assert!(!registry.is_revoked("req".into()));
+        assert_eq!(env.balance_of(&challenger), before);
+    }
+
+    #[test]
+    fn challenge_disabled_when_window_zero() {
+        let env = odra_test::env();
+        let mut registry = deploy(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "h".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "h".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(3));
+        assert_eq!(
+            registry.try_challenge("req".into(), "counter".into()),
+            Err(Error::ChallengeWindowClosed.into())
+        );
     }
 }

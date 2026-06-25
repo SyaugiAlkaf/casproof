@@ -4,7 +4,7 @@ const PHASES = [
     timeline: "Live on testnet",
     live: true,
     unlocks:
-      "require_quorum guard, slashable reputation, and PayoutVault deployed and tested (19 OdraVM unit tests). Any consuming contract composes the gate today; the API will not change as proof sources evolve."
+      "require_quorum guard, slashable reputation, and PayoutVault deployed and tested (61 OdraVM tests incl. adversarial bypass regressions), plus three more reference consumers and a fraud-proof challenge window. Any consuming contract composes the gate today; the API will not change as proof sources evolve."
   },
   {
     phase: "Phase 2 — Pluggable proof sources",

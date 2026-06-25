@@ -3,9 +3,9 @@ import * as sdk from "casper-js-sdk";
 
 const { RpcClient, HttpHandler } = sdk;
 
-const NODE_URL = process.env.CASPER_CHAIN_RPC ?? process.env.CASPER_NODE_URL ?? "";
-const CONTRACT_HASH = (process.env.REGISTRY_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
-const VAULT_HASH = (process.env.VAULT_CONTRACT_HASH ?? "").replace(/^(hash-|entity-contract-|contract-)/, "");
+const NODE_URL = process.env.CASPER_CHAIN_RPC ?? process.env.CASPER_NODE_URL ?? "https://node.testnet.casper.network/rpc";
+const CONTRACT_HASH = (process.env.REGISTRY_CONTRACT_HASH ?? "ecb2b8cc188254edc12d9f7f955fd000629fcfeef69c2912432d53053c57ca29").replace(/^(hash-|entity-contract-|contract-)/, "");
+const VAULT_HASH = (process.env.VAULT_CONTRACT_HASH ?? "c5e070238a6e818272fb9c27fa25929a79187b7f48136ff4355c956671ce36ae").replace(/^(hash-|entity-contract-|contract-)/, "");
 const CSPR_CLOUD = process.env.CSPR_CLOUD_BASE ?? "https://api.testnet.cspr.cloud";
 const CSPR_CLOUD_KEY = process.env.CSPR_CLOUD_API_KEY ?? "";
 const EXPLORER = process.env.EXPLORER_BASE ?? "https://testnet.cspr.live";

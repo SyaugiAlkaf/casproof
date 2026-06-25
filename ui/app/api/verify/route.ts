@@ -12,10 +12,10 @@ import {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_REQUEST_ID = process.env.REQUEST_ID ?? process.env.NEXT_PUBLIC_REQUEST_ID ?? "";
+const DEFAULT_REQUEST_ID = process.env.REQUEST_ID ?? process.env.NEXT_PUBLIC_REQUEST_ID ?? "823d1427b2bdfbae-mqsyp55n";
 // The on-chain threshold is the k that setup.ts wrote with set_quorum; surface it for the
 // display denominator (the PAY/BLOCK decision uses quorum_output, not this number).
-const QUORUM_THRESHOLD = Number(process.env.QUORUM_THRESHOLD ?? process.env.NEXT_PUBLIC_QUORUM_THRESHOLD ?? 0) || 0;
+const QUORUM_THRESHOLD = Number(process.env.QUORUM_THRESHOLD ?? process.env.NEXT_PUBLIC_QUORUM_THRESHOLD ?? 2) || 2;
 
 const MAX_BODY_BYTES = 32 * 1024;
 

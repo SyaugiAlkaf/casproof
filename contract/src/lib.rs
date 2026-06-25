@@ -443,6 +443,98 @@ impl PayoutVault {
     }
 }
 
+#[odra::event]
+pub struct OutcomeSettled {
+    pub request_id: String,
+    pub outcome_hash: String,
+    pub winner: Address,
+    pub signer: Address,
+}
+
+/// A rival-shaped outcome escrow (the OutcomePay / Escrow402 pattern) made unbypassable by
+/// the guard. Stake escrow on a predicted outcome and bind the winner; settle pays the
+/// winner ONLY when the outcome is quorum-attested. `settle` cross-calls `require_quorum`
+/// first, so a poisoned or under-quorum outcome reverts before a single mote moves — the
+/// field's two-step verify-then-settle gap closed in one atomic VM call.
+#[odra::module(events = [OutcomeSettled])]
+pub struct OutcomeEscrow {
+    registry: External<RegistryContractRef>,
+    authorized: Var<Address>,
+    settled: Mapping<String, bool>,
+    refunded: Mapping<String, bool>,
+    escrow: Mapping<String, U512>,
+    winner: Mapping<String, Address>,
+}
+
+#[odra::module]
+impl OutcomeEscrow {
+    pub fn init(&mut self, registry: Address, authorized: Address) {
+        self.registry.set(registry);
+        self.authorized.set(authorized);
+    }
+
+    /// Escrow the attached CSPR for `request_id` and bind the winner on-chain (never a
+    /// free-form settle arg). Authorized-only.
+    #[odra(payable)]
+    pub fn stake(&mut self, request_id: String, winner: Address) {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
+        let prior = self.escrow.get(&request_id).unwrap_or_default();
+        self.escrow.set(&request_id, prior + self.env().attached_value());
+        self.winner.set(&request_id, winner);
+    }
+
+    /// Settle the escrow to the bound winner — only when `outcome_hash` is the quorum-attested
+    /// result for `request_id`. `require_quorum` runs first, so a poisoned/under-quorum outcome
+    /// reverts before any transfer. One-shot and mutually exclusive with refund.
+    pub fn settle(&mut self, request_id: String, outcome_hash: String) -> Address {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
+        let signer = self.registry.require_quorum(request_id.clone(), outcome_hash.clone());
+        if self.settled.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        if self.refunded.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyRefunded);
+        }
+        self.settled.set(&request_id, true);
+        let winner = self.winner.get(&request_id).unwrap_or_revert(&self.env());
+        let amount = self.escrow.get(&request_id).unwrap_or_default();
+        if amount > U512::zero() {
+            self.env().transfer_tokens(&winner, &amount);
+        }
+        self.env().emit_event(OutcomeSettled {
+            request_id,
+            outcome_hash,
+            winner,
+            signer,
+        });
+        signer
+    }
+
+    /// Return the escrow to the payer when the outcome never reaches quorum. Authorized-only,
+    /// one-shot, mutually exclusive with settle (escrow is never both settled and refunded).
+    pub fn refund(&mut self, request_id: String) {
+        let payer = self.authorized.get().unwrap_or_revert(&self.env());
+        if self.env().caller() != payer {
+            self.env().revert(Error::NotAuthorized);
+        }
+        if self.settled.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        if self.refunded.get(&request_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyRefunded);
+        }
+        self.refunded.set(&request_id, true);
+        let amount = self.escrow.get(&request_id).unwrap_or_default();
+        if amount > U512::zero() {
+            self.env().transfer_tokens(&payer, &amount);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1008,5 +1100,137 @@ mod tests {
             registry.try_transfer_ownership(env.get_account(0)),
             Err(Error::NotOwner.into())
         );
+    }
+
+    fn deploy_escrow(env: &HostEnv) -> (AttestationRegistryHostRef, OutcomeEscrowHostRef) {
+        let registry = AttestationRegistry::deploy(env, NoArgs);
+        let escrow = OutcomeEscrow::deploy(
+            env,
+            OutcomeEscrowInitArgs { registry: registry.address(), authorized: env.get_account(0) },
+        );
+        (registry, escrow)
+    }
+
+    #[test]
+    fn settle_pays_winner_on_quorum() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let winner = env.get_account(3);
+        let amount = U512::from(2_000_000_000u64);
+        escrow.with_tokens(amount).stake("req".into(), winner);
+        let before = env.balance_of(&winner);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "o".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(escrow.settle("req".into(), "o".into()), env.get_account(0));
+        assert_eq!(env.balance_of(&winner), before + amount);
+    }
+
+    #[test]
+    fn settle_reverts_without_quorum() {
+        // The kill move: the rival outcome-escrow pattern cannot pay on an unverified outcome.
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let winner = env.get_account(3);
+        let amount = U512::from(2_000_000_000u64);
+        escrow.with_tokens(amount).stake("req".into(), winner);
+        let before = env.balance_of(&winner);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(escrow.try_settle("req".into(), "o".into()), Err(Error::NoQuorum.into()));
+        assert_eq!(env.balance_of(&winner), before);
+    }
+
+    #[test]
+    fn settle_blocked_after_slash() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        let s3 = env.get_account(2);
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+        let winner = env.get_account(4);
+        escrow.with_tokens(U512::from(1_000_000_000u64)).stake("req".into(), winner);
+        env.set_caller(s2);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(s3);
+        registry.attest("req".into(), "o".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        registry.slash(s2);
+        registry.slash(s3);
+        assert_eq!(escrow.try_settle("req".into(), "o".into()), Err(Error::NoQuorum.into()));
+    }
+
+    #[test]
+    fn unauthorized_caller_cannot_settle() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "o".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(5));
+        assert_eq!(escrow.try_settle("req".into(), "o".into()), Err(Error::NotAuthorized.into()));
+    }
+
+    #[test]
+    fn settle_is_one_shot() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let winner = env.get_account(3);
+        escrow.with_tokens(U512::from(1_000_000_000u64)).stake("req".into(), winner);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "o".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert!(escrow.try_settle("req".into(), "o".into()).is_ok());
+        assert_eq!(escrow.try_settle("req".into(), "o".into()), Err(Error::AlreadyReleased.into()));
+    }
+
+    #[test]
+    fn escrow_refund_returns_stake_when_no_quorum() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let winner = env.get_account(3);
+        let payer = env.get_account(0);
+        let amount = U512::from(2_000_000_000u64);
+        let payer_before = env.balance_of(&payer);
+        escrow.with_tokens(amount).stake("req".into(), winner);
+        assert_eq!(env.balance_of(&payer), payer_before - amount);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(payer);
+        assert_eq!(escrow.try_settle("req".into(), "o".into()), Err(Error::NoQuorum.into()));
+        escrow.refund("req".into());
+        assert_eq!(env.balance_of(&payer), payer_before);
+        assert_eq!(escrow.try_refund("req".into()), Err(Error::AlreadyRefunded.into()));
+    }
+
+    #[test]
+    fn settled_request_cannot_be_refunded() {
+        let env = odra_test::env();
+        let (mut registry, mut escrow) = deploy_escrow(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let winner = env.get_account(3);
+        escrow.with_tokens(U512::from(1_000_000_000u64)).stake("req".into(), winner);
+        registry.attest("req".into(), "o".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "o".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert!(escrow.try_settle("req".into(), "o".into()).is_ok());
+        assert_eq!(escrow.try_refund("req".into()), Err(Error::AlreadyReleased.into()));
     }
 }

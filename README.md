@@ -151,7 +151,7 @@ Two further issues were addressed: **H1** — `PayoutVault.release` now checks t
 
 ### Test coverage
 
-`cd contract && cargo odra test` runs 30 tests: 23 functional tests covering the full attested lifecycle plus reputation, slashing, refund, and ownership transfer; and 7 adversarial regression tests that each reproduce a specific exploit and prove it is now blocked:
+`cd contract && cargo odra test` runs 61 tests across the registry, the four reference consumers, and the fraud-proof challenge window — covering the full attested lifecycle plus reputation, slashing, refund, ownership, and the challenge state machine; including adversarial regression tests that each reproduce a specific exploit and prove it is now blocked:
 
 - `c1_collision_framings_cannot_forge_quorum` — the three colliding framings from the C1 audit produce three separate counters, none reaching quorum
 - `c1_attest_rejects_separator_in_inputs` — `attest` reverts on inputs containing `#`
@@ -160,15 +160,25 @@ Two further issues were addressed: **H1** — `PayoutVault.release` now checks t
 - `h1_release_is_one_shot` — a second call to `release` on the same request reverts
 - `m1_lowering_threshold_cannot_seal_an_inflight_request` — lowering `set_quorum` mid-flight does not seal an under-quorum request
 - `m2_release_moves_escrowed_funds_only_on_quorum` — `release` transfers escrowed CSPR to the bound beneficiary after the guard passes, and reverts before a single mote moves when the guard fails
+- `one_quorum_proof_cannot_stamp_a_different_asset_or_value` — a quorum on one (asset, valuation) cannot be replayed to stamp a different asset or a substituted value; the RWA gate binds the pair into the attested commitment
+- `challenge_uphold_slashes_panel_and_revokes_quorum` / `stale_challenge_can_be_finalized_by_anyone` — the fraud-proof window slashes a fraudulent panel and revokes its quorum, and self-heals if the owner never resolves
 
-Casproof is the only entry in this buildathon shipping adversarial tests that reproduce gate-bypass exploits and prove each one is closed.
+Casproof is the only entry in this buildathon shipping adversarial tests that reproduce gate-bypass exploits and prove each one is closed. The four reference consumers and the challenge window are exercised by this OdraVM suite — the audited primitives; the **live** testnet demo runs PayoutVault end-to-end (the PAY / REVERT links above).
+
+### Fraud-proof challenge window
+
+Beyond "trust + slashing," Casproof ships an on-chain fraud-proof step toward verified computation. After a request reaches quorum, anyone may open a bonded `challenge(request_id, counter_hash)` within a configurable window, claiming a contradicting result. While a challenge is pending, `require_quorum` is frozen, so no consumer acts on a contested output. The owner calls `resolve_challenge`: **uphold** slashes every agreeing signer, permanently revokes the quorum (`require_quorum` reverts forever — any gated payout is dead), and returns the bond; **reject** keeps the quorum and forfeits the bond (kept in the vault, never paid to the owner, so the adjudicator has no motive to dismiss a real fraud-proof).
+
+Two liveness guarantees back it: a value-bearing consumer can compose `require_final_quorum`, which waits out the window before passing — so it cannot be front-run by a quorum that is challenged and revoked moments later; and `finalize_stale_challenge` lets **anyone** clear a challenge the owner never resolves, so no dispute — and no renounced or absent owner — can freeze a payout forever.
+
+This is owner-adjudicated optimistic verification today. Trustless resolution — a TEE/zkML recompute that adjudicates a challenge without an owner — is the roadmap; the challenge primitive is the slot it plugs into.
 
 
 ## Components
 
 | Path | What it is |
 |---|---|
-| `contract/` | Two [Odra](https://odra.dev) (Rust → WASM) contracts: `AttestationRegistry` (quorum-native, trusted-signer-gated `attest`, composable `require_quorum` guard, slashable `reputation`) and `PayoutVault` — a consumer that composes `require_quorum` so verify-and-act are one atomic VM call. 26 OdraVM tests (19 functional + 7 adversarial). |
+| `contract/` | Five [Odra](https://odra.dev) (Rust → WASM) contracts: `AttestationRegistry` (quorum-native `attest`, composable `require_quorum` / `require_final_quorum` guards, slashable `reputation`, fraud-proof challenge window) and four reference consumers composing the guard — `PayoutVault`, `OutcomeEscrow`, `RWAValuationGate`, `OracleGatedSwap`. 61 OdraVM tests incl. adversarial bypass regressions. |
 | `agents/` | TypeScript multi-model producer panel, autonomous consumer agent, on-chain read library, x402 verify server, MCP server, slash script, and keygen/deploy/resolve/setup scripts (`casper-js-sdk` v5, Anthropic API). |
 | `ui/` | Next.js dashboard (CSPR.click wallet connect) — verify an output, show the attestation badge and explorer link, and the live poison→block contrast screen. |
 
@@ -186,7 +196,7 @@ Casproof is the only entry in this buildathon shipping adversarial tests that re
 
 ```bash
 cd contract
-make test                # OdraVM unit tests (26 tests: 19 functional + 7 adversarial)
+make test                # OdraVM unit tests (61 tests incl. adversarial bypass regressions)
 make build               # build + wasm-opt -Oz → wasm/AttestationRegistry.wasm (~192 KB)
 ```
 

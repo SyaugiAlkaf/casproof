@@ -99,6 +99,38 @@ Casproof ships an [MCP](https://modelcontextprotocol.io) server so any AI agent 
 
 This is exactly the pattern Casper's AI toolkit is built around — *agents discover capabilities via MCP, pay via x402, settle on-chain* — and it makes Casproof both a **consumer** of agentic infrastructure (it attests its own AI outputs) and a **provider** of it (other agents call it to verify-before-act).
 
+## A primitive, not an app
+
+Casproof is not one application that verifies one thing. It is a composable guard that any Casper contract composes to make its own action unskippable.
+
+`registry.require_quorum(request_id, output_hash) → Address` is a single cross-contract call. It either passes — returning the lead attesting signer — or it reverts the entire transaction. A consuming contract that calls it as the first step of its action entrypoint gets atomic verify-and-act for free. The guard is the product; the consumer supplies the action.
+
+### Four reference consumers, one guard
+
+Each composes the *same* `require_quorum` guard as the first line of its action, and each ships with adversarial tests proving a poisoned or under-quorum output reverts before the action runs.
+
+- **PayoutVault** — escrow a payout and release it only on a quorum-attested output. [Live on testnet](https://testnet.cspr.live/contract/c7d68a16dcfd78aa9c0b6a7ed12b837b9a1dfd72bd4668e6361c2ec263392b23); [genuine → PAY](https://testnet.cspr.live/deploy/b1e88bb8c06fa3fe9d7d7bae73a5b5ccc534ba4a9f918e6dd80311d6e349ef54), [poisoned → REVERT](https://testnet.cspr.live/deploy/34e7b7a9afeaba9a4cf60e52ac28c98a99dc34063735e3e4617135080a07e318).
+- **OutcomeEscrow** — *the kill move.* A faithful rebuild of the OutcomePay / Escrow402 outcome-escrow pattern (stake on a predicted outcome, pay the winner on resolution) — but `settle` cross-calls `require_quorum` first, so it physically cannot pay on an unverified or poisoned outcome. The exact pattern two of the strongest competitors ship, made unbypassable by sitting beneath it.
+- **RWAValuationGate** — accept an RWA asset valuation only if it is quorum-attested, so downstream lending/collateral logic reads a value that provably passed k-of-n.
+- **OracleGatedSwap** — execute a swap only on a quorum-attested price feed; proves the guard gates a non-payout action, not just payouts.
+
+Four consumers. One `require_quorum`. No change to the guard API between them — `cd contract && cargo odra test` exercises all four, each with its bypass-attempt tests.
+
+### Wrap any action in three lines
+
+```rust
+let signer = self.registry.require_quorum(request_id, output_hash); // reverts NoQuorum unless quorum-attested AND signers still trusted
+// ...your value action runs only past this line, in the SAME VM call...
+self.do_action(); // unbypassable: no off-chain step between check and act
+```
+
+### Where casproof sits in the stack
+
+Other agent-economy entries are applications: they verify an output and act on it, each with their own two-step trust logic. Casproof sits one layer below. Vouch writes an off-chain k-of-n verdict and then acts — two steps with a window. verity checks reputation and proceeds — verify then act. Either could call `require_quorum` as the first line of their action entrypoint and close the gap without rebuilding their trust logic. OutcomeEscrow above is exactly that move, done for the escrow pattern.
+
+Casproof is the slot the rest of the field plugs into. The guard is [live on Casper testnet](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) — any Casper contract can cross-call it today.
+
+
 ## Security
 
 ### The gap the rest of the field leaves open

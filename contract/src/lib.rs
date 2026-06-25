@@ -535,6 +535,70 @@ impl OutcomeEscrow {
     }
 }
 
+#[odra::event]
+pub struct ValuationAccepted {
+    pub request_id: String,
+    pub valuation_hash: String,
+    pub asset_id: String,
+    pub valuation: U512,
+    pub signer: Address,
+}
+
+/// Accepts an RWA asset valuation only if it is quorum-attested. Producer agents attest a
+/// valuation; this gate is its on-chain acceptance — `accept` cross-calls require_quorum
+/// first, so a poisoned/under-quorum valuation reverts before any value is recorded. Any
+/// downstream lending/collateral contract reads a valuation that provably passed k-of-n.
+#[odra::module(events = [ValuationAccepted])]
+pub struct RWAValuationGate {
+    registry: External<RegistryContractRef>,
+    authorized: Var<Address>,
+    accepted: Mapping<String, bool>,
+    valuation: Mapping<String, U512>,
+    valuer: Mapping<String, Address>,
+}
+
+#[odra::module]
+impl RWAValuationGate {
+    pub fn init(&mut self, registry: Address, authorized: Address) {
+        self.registry.set(registry);
+        self.authorized.set(authorized);
+    }
+
+    /// Accept and store `valuation` for `asset_id` only when `valuation_hash` is the
+    /// quorum-attested result for `request_id`. Authorized-only, one-shot per asset.
+    pub fn accept(
+        &mut self,
+        request_id: String,
+        valuation_hash: String,
+        asset_id: String,
+        valuation: U512,
+    ) -> Address {
+        if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
+            self.env().revert(Error::NotAuthorized);
+        }
+        let signer = self.registry.require_quorum(request_id.clone(), valuation_hash.clone());
+        if self.accepted.get(&asset_id).unwrap_or(false) {
+            self.env().revert(Error::AlreadyReleased);
+        }
+        self.accepted.set(&asset_id, true);
+        self.valuation.set(&asset_id, valuation);
+        self.valuer.set(&asset_id, signer);
+        self.env().emit_event(ValuationAccepted {
+            request_id,
+            valuation_hash,
+            asset_id,
+            valuation,
+            signer,
+        });
+        signer
+    }
+
+    /// The accepted (quorum-passed) valuation for an asset, or None.
+    pub fn valuation_of(&self, asset_id: String) -> Option<U512> {
+        self.valuation.get(&asset_id)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1232,5 +1296,104 @@ mod tests {
         env.set_caller(env.get_account(0));
         assert!(escrow.try_settle("req".into(), "o".into()).is_ok());
         assert_eq!(escrow.try_refund("req".into()), Err(Error::AlreadyReleased.into()));
+    }
+
+    fn deploy_rwa(env: &HostEnv) -> (AttestationRegistryHostRef, RWAValuationGateHostRef) {
+        let registry = AttestationRegistry::deploy(env, NoArgs);
+        let gate = RWAValuationGate::deploy(
+            env,
+            RWAValuationGateInitArgs { registry: registry.address(), authorized: env.get_account(0) },
+        );
+        (registry, gate)
+    }
+
+    #[test]
+    fn valuation_accepted_on_quorum() {
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        let v = U512::from(1_278_000u64);
+        assert_eq!(gate.accept("req".into(), "vh".into(), "PARK-NOTE-001".into(), v), env.get_account(0));
+        assert_eq!(gate.valuation_of("PARK-NOTE-001".into()), Some(v));
+    }
+
+    #[test]
+    fn accept_reverts_without_quorum() {
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        assert_eq!(
+            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            Err(Error::NoQuorum.into())
+        );
+        assert_eq!(gate.valuation_of("A1".into()), None);
+    }
+
+    #[test]
+    fn accept_blocked_after_slash() {
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        let s3 = env.get_account(2);
+        registry.set_trusted(s2, true);
+        registry.set_trusted(s3, true);
+        env.set_caller(s2);
+        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        env.set_caller(s3);
+        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        registry.slash(s2);
+        registry.slash(s3);
+        assert_eq!(
+            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            Err(Error::NoQuorum.into())
+        );
+        assert_eq!(gate.valuation_of("A1".into()), None);
+    }
+
+    #[test]
+    fn unauthorized_caller_cannot_accept() {
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(5));
+        assert_eq!(
+            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            Err(Error::NotAuthorized.into())
+        );
+    }
+
+    #[test]
+    fn accept_is_one_shot() {
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+        let v = U512::from(100u64);
+        assert!(gate.try_accept("req".into(), "vh".into(), "A1".into(), v).is_ok());
+        assert_eq!(
+            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(999u64)),
+            Err(Error::AlreadyReleased.into())
+        );
+        assert_eq!(gate.valuation_of("A1".into()), Some(v));
     }
 }

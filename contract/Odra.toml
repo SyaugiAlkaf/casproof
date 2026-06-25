@@ -6,3 +6,6 @@ fqn = "casproof_contract::PayoutVault"
 
 [[contracts]]
 fqn = "casproof_contract::OutcomeEscrow"
+
+[[contracts]]
+fqn = "casproof_contract::RWAValuationGate"

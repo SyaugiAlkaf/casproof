@@ -4,6 +4,7 @@ extern crate alloc;
 
 use odra::prelude::*;
 use odra::casper_types::U512;
+use odra::casper_types::bytesrepr::ToBytes;
 
 /// A single agent's attestation of an AI output. One record is kept per distinct
 /// `output_hash` (the first signer to attest it writes the record); `reputation`
@@ -535,19 +536,29 @@ impl OutcomeEscrow {
     }
 }
 
+/// Lowercase hex of bytes (no_std, panic-free).
+fn to_hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut s = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
+    }
+    s
+}
+
 #[odra::event]
 pub struct ValuationAccepted {
     pub request_id: String,
-    pub valuation_hash: String,
     pub asset_id: String,
     pub valuation: U512,
     pub signer: Address,
 }
 
-/// Accepts an RWA asset valuation only if it is quorum-attested. Producer agents attest a
-/// valuation; this gate is its on-chain acceptance — `accept` cross-calls require_quorum
-/// first, so a poisoned/under-quorum valuation reverts before any value is recorded. Any
-/// downstream lending/collateral contract reads a valuation that provably passed k-of-n.
+/// Accepts an RWA asset valuation only if it is quorum-attested. The attested output hash
+/// canonically binds (asset_id, valuation): `accept` recomputes that commitment on-chain and
+/// gates on it, so the quorum provably covers the exact stored pair — a substituted asset or
+/// value yields a different hash and reverts. One-shot per request: one proof, one acceptance.
 #[odra::module(events = [ValuationAccepted])]
 pub struct RWAValuationGate {
     registry: External<RegistryContractRef>,
@@ -564,28 +575,34 @@ impl RWAValuationGate {
         self.authorized.set(authorized);
     }
 
-    /// Accept and store `valuation` for `asset_id` only when `valuation_hash` is the
-    /// quorum-attested result for `request_id`. Authorized-only, one-shot per asset.
-    pub fn accept(
-        &mut self,
-        request_id: String,
-        valuation_hash: String,
-        asset_id: String,
-        valuation: U512,
-    ) -> Address {
+    /// The canonical on-chain commitment for a valuation: hex(blake2b(asset_id || valuation)).
+    /// Producer agents attest THIS hash, so quorum binds the exact (asset_id, valuation) pair.
+    pub fn commitment(&self, asset_id: String, valuation: U512) -> String {
+        let value_bytes = match valuation.to_bytes() {
+            Ok(b) => b,
+            Err(_) => self.env().revert(Error::InvalidInput),
+        };
+        let mut pre = asset_id.into_bytes();
+        pre.extend_from_slice(&value_bytes);
+        to_hex(&self.env().hash(pre))
+    }
+
+    /// Accept and store `valuation` for `asset_id` only when its commitment is the
+    /// quorum-attested result for `request_id`. Authorized-only, one-shot per request.
+    pub fn accept(&mut self, request_id: String, asset_id: String, valuation: U512) -> Address {
         if self.env().caller() != self.authorized.get().unwrap_or_revert(&self.env()) {
             self.env().revert(Error::NotAuthorized);
         }
-        let signer = self.registry.require_quorum(request_id.clone(), valuation_hash.clone());
-        if self.accepted.get(&asset_id).unwrap_or(false) {
+        let valuation_hash = self.commitment(asset_id.clone(), valuation);
+        let signer = self.registry.require_quorum(request_id.clone(), valuation_hash);
+        if self.accepted.get(&request_id).unwrap_or(false) {
             self.env().revert(Error::AlreadyReleased);
         }
-        self.accepted.set(&asset_id, true);
+        self.accepted.set(&request_id, true);
         self.valuation.set(&asset_id, valuation);
         self.valuer.set(&asset_id, signer);
         self.env().emit_event(ValuationAccepted {
             request_id,
-            valuation_hash,
             asset_id,
             valuation,
             signer,
@@ -1368,6 +1385,25 @@ mod tests {
         (registry, gate)
     }
 
+    // Two trusted signers attest the gate's canonical commitment of (asset, valuation),
+    // leaving the caller as the authorized account (0).
+    fn attest_valuation(
+        env: &HostEnv,
+        registry: &mut AttestationRegistryHostRef,
+        gate: &RWAValuationGateHostRef,
+        s2: Address,
+        req: &str,
+        asset: &str,
+        valuation: U512,
+    ) {
+        let vh = gate.commitment(asset.into(), valuation);
+        env.set_caller(env.get_account(0));
+        registry.attest(req.into(), vh.clone(), "a".into(), "p".into());
+        env.set_caller(s2);
+        registry.attest(req.into(), vh, "b".into(), "p".into());
+        env.set_caller(env.get_account(0));
+    }
+
     #[test]
     fn valuation_accepted_on_quorum() {
         let env = odra_test::env();
@@ -1375,12 +1411,9 @@ mod tests {
         registry.set_quorum(2);
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
-        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
-        env.set_caller(s2);
-        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
-        env.set_caller(env.get_account(0));
         let v = U512::from(1_278_000u64);
-        assert_eq!(gate.accept("req".into(), "vh".into(), "PARK-NOTE-001".into(), v), env.get_account(0));
+        attest_valuation(&env, &mut registry, &gate, s2, "req", "PARK-NOTE-001", v);
+        assert_eq!(gate.accept("req".into(), "PARK-NOTE-001".into(), v), env.get_account(0));
         assert_eq!(gate.valuation_of("PARK-NOTE-001".into()), Some(v));
     }
 
@@ -1389,10 +1422,12 @@ mod tests {
         let env = odra_test::env();
         let (mut registry, mut gate) = deploy_rwa(&env);
         registry.set_quorum(2);
-        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        let v = U512::from(1u64);
+        let vh = gate.commitment("A1".into(), v);
+        registry.attest("req".into(), vh, "a".into(), "p".into());
         env.set_caller(env.get_account(0));
         assert_eq!(
-            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            gate.try_accept("req".into(), "A1".into(), v),
             Err(Error::NoQuorum.into())
         );
         assert_eq!(gate.valuation_of("A1".into()), None);
@@ -1407,15 +1442,17 @@ mod tests {
         let s3 = env.get_account(2);
         registry.set_trusted(s2, true);
         registry.set_trusted(s3, true);
+        let v = U512::from(5u64);
+        let vh = gate.commitment("A1".into(), v);
         env.set_caller(s2);
-        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
+        registry.attest("req".into(), vh.clone(), "a".into(), "p".into());
         env.set_caller(s3);
-        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        registry.attest("req".into(), vh, "b".into(), "p".into());
         env.set_caller(env.get_account(0));
         registry.slash(s2);
         registry.slash(s3);
         assert_eq!(
-            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            gate.try_accept("req".into(), "A1".into(), v),
             Err(Error::NoQuorum.into())
         );
         assert_eq!(gate.valuation_of("A1".into()), None);
@@ -1428,12 +1465,11 @@ mod tests {
         registry.set_quorum(2);
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
-        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
-        env.set_caller(s2);
-        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
+        let v = U512::from(7u64);
+        attest_valuation(&env, &mut registry, &gate, s2, "req", "A1", v);
         env.set_caller(env.get_account(5));
         assert_eq!(
-            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(1u64)),
+            gate.try_accept("req".into(), "A1".into(), v),
             Err(Error::NotAuthorized.into())
         );
     }
@@ -1445,17 +1481,41 @@ mod tests {
         registry.set_quorum(2);
         let s2 = env.get_account(1);
         registry.set_trusted(s2, true);
-        registry.attest("req".into(), "vh".into(), "a".into(), "p".into());
-        env.set_caller(s2);
-        registry.attest("req".into(), "vh".into(), "b".into(), "p".into());
-        env.set_caller(env.get_account(0));
         let v = U512::from(100u64);
-        assert!(gate.try_accept("req".into(), "vh".into(), "A1".into(), v).is_ok());
+        attest_valuation(&env, &mut registry, &gate, s2, "req", "A1", v);
+        assert!(gate.try_accept("req".into(), "A1".into(), v).is_ok());
         assert_eq!(
-            gate.try_accept("req".into(), "vh".into(), "A1".into(), U512::from(999u64)),
+            gate.try_accept("req".into(), "A1".into(), v),
             Err(Error::AlreadyReleased.into())
         );
         assert_eq!(gate.valuation_of("A1".into()), Some(v));
+    }
+
+    #[test]
+    fn one_quorum_proof_cannot_stamp_a_different_asset_or_value() {
+        // The audit-blocking bypass, now closed: a quorum on (asset A, value v) cannot be
+        // reused to stamp a different asset or a substituted value — the on-chain commitment
+        // differs, so require_quorum reverts.
+        let env = odra_test::env();
+        let (mut registry, mut gate) = deploy_rwa(&env);
+        registry.set_quorum(2);
+        let s2 = env.get_account(1);
+        registry.set_trusted(s2, true);
+        let v = U512::from(1_000u64);
+        attest_valuation(&env, &mut registry, &gate, s2, "req", "ASSET-A", v);
+        // substituted value for the same asset -> different commitment -> NoQuorum
+        assert_eq!(
+            gate.try_accept("req".into(), "ASSET-A".into(), U512::from(999_999u64)),
+            Err(Error::NoQuorum.into())
+        );
+        // different asset reusing the same proof -> different commitment -> NoQuorum
+        assert_eq!(
+            gate.try_accept("req".into(), "ASSET-B".into(), v),
+            Err(Error::NoQuorum.into())
+        );
+        assert_eq!(gate.valuation_of("ASSET-B".into()), None);
+        // the honestly-attested pair still accepts
+        assert!(gate.try_accept("req".into(), "ASSET-A".into(), v).is_ok());
     }
 
     fn deploy_swap(env: &HostEnv) -> (AttestationRegistryHostRef, OracleGatedSwapHostRef) {

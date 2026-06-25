@@ -32,12 +32,13 @@ const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
   .filter(Boolean);
 
 // Field indices track the storage-field declaration order in AttestationRegistry
-// (contract/src/lib.rs). Odra numbers module fields from 1, so the struct maps to:
-// owner(1), quorum_threshold(2), trusted(3), attestation_count(4), attestations(5),
-// agreement(6), quorum_output(7), voted(8), slashes(9). Verified on testnet.
-const ATTESTATIONS_FIELD_INDEX = 5;
-const AGREEMENT_FIELD_INDEX = 6;
-const QUORUM_OUTPUT_FIELD_INDEX = 7;
+// (contract/src/lib.rs). Odra numbers module fields from 1. Post-hardening layout:
+// owner(1), renounced(2), quorum_threshold(3), trusted(4), attestation_count(5),
+// attestations(6), agreement(7), attested(8), agree_signers(9), req_threshold(10),
+// quorum_output(11), voted(12), slashes(13), slashed(14).
+const ATTESTATIONS_FIELD_INDEX = 6;
+const AGREEMENT_FIELD_INDEX = 7;
+const QUORUM_OUTPUT_FIELD_INDEX = 11;
 const STATE_DICTIONARY = "state";
 
 export const rpc = new RpcClient(new HttpHandler(NODE_URL));
@@ -155,8 +156,7 @@ export interface VaultReleaseResult {
 export async function releaseVault(
   key: PrivateKey,
   reqId: string,
-  outputHash: string,
-  beneficiaryAccountHash: string
+  outputHash: string
 ): Promise<VaultReleaseResult> {
   if (!NODE_URL) throw new Error("CASPER_CHAIN_RPC / CASPER_NODE_URL not set");
   if (!VAULT_HASH) throw new Error("VAULT_CONTRACT_HASH not set — deploy the vault first");
@@ -167,6 +167,38 @@ export async function releaseVault(
       Args.fromMap({
         request_id: CLValue.newCLString(reqId),
         output_hash: CLValue.newCLString(outputHash),
+      })
+    )
+    .from(key.publicKey)
+    .chainName(NETWORK)
+    .payment(VAULT_PAYMENT)
+    .build();
+  tx.sign(key);
+
+  const res = await rpc.putTransaction(tx);
+  const txHash = hashHex(res.transactionHash);
+  const info = await rpc.waitForTransaction(tx, 180_000);
+  const error = info.executionInfo?.executionResult?.errorMessage;
+  return { txHash, authorized: !error, reason: error ?? undefined, explorer: explorerTxUrl(txHash) };
+}
+
+// Binds the beneficiary for a request (M2 deposit). Casper's SDK cannot attach CSPR to a
+// stored-contract call, so this binds the beneficiary with no escrow value; funding the
+// escrow purse uses Odra's proxy_caller session path (roadmap). The escrow transfer itself
+// is exercised in the contract test suite (m2_release_moves_escrowed_funds_only_on_quorum).
+export async function depositVault(
+  key: PrivateKey,
+  reqId: string,
+  beneficiaryAccountHash: string
+): Promise<VaultReleaseResult> {
+  if (!NODE_URL) throw new Error("CASPER_CHAIN_RPC / CASPER_NODE_URL not set");
+  if (!VAULT_HASH) throw new Error("VAULT_CONTRACT_HASH not set — deploy the vault first");
+  const tx = new ContractCallBuilder()
+    .byHash(VAULT_HASH)
+    .entryPoint("deposit")
+    .runtimeArgs(
+      Args.fromMap({
+        request_id: CLValue.newCLString(reqId),
         beneficiary: CLValue.newCLKey(Key.newKey(beneficiaryAccountHash)),
       })
     )
@@ -214,15 +246,18 @@ export async function readQuorum(reqId: string): Promise<string | null> {
 // How many distinct trusted signers have attested this exact output for this request.
 export async function readAgreement(reqId: string, outputHash: string): Promise<number> {
   requireContract();
-  const b = await readStateBytes(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
+  const b = await readDictItem(stateItemKeyTuple(AGREEMENT_FIELD_INDEX, reqId, outputHash));
   return b ? u32le(b) : 0;
 }
 
 // Odra stores each field value as a CLValue List<U8> (the bytesrepr of the underlying type).
 // Read it raw and return the decoded byte array, or null if the item does not exist.
 async function readStateBytes(fieldIndex: number, key: string): Promise<number[] | null> {
+  return readDictItem(stateItemKey(fieldIndex, key));
+}
+
+async function readDictItem(itemKey: string): Promise<number[] | null> {
   const seedUref = await resolveStateUref();
-  const itemKey = stateItemKey(fieldIndex, key);
   const srh = await stateRootHash();
   const body = {
     jsonrpc: "2.0",
@@ -290,15 +325,29 @@ async function resolveStateUref(): Promise<string> {
   );
 }
 
+// Odra String bytesrepr = u32_le(len) ++ utf8.
+function stringBytes(s: string): Buffer {
+  const utf8 = Buffer.from(s, "utf8");
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(utf8.length, 0);
+  return Buffer.concat([len, utf8]);
+}
+
 // item key = hex(blake2b256( u32_be(field_index) ++ string_to_bytes(key) )),
 // mirroring Odra's odra-core contract_env::current_key for a top-level Mapping field.
 export function stateItemKey(fieldIndex: number, key: string): string {
   const idx = Buffer.alloc(4);
   idx.writeUInt32BE(fieldIndex, 0);
-  const utf8 = Buffer.from(key, "utf8");
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(utf8.length, 0);
-  const preimage = Buffer.concat([idx, len, utf8]);
+  const preimage = Buffer.concat([idx, stringBytes(key)]);
+  return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
+}
+
+// Tuple (String, String) Mapping key: bytesrepr concatenates the two elements,
+// so the preimage is field_index_be ++ string_bytes(a) ++ string_bytes(b).
+export function stateItemKeyTuple(fieldIndex: number, a: string, b: string): string {
+  const idx = Buffer.alloc(4);
+  idx.writeUInt32BE(fieldIndex, 0);
+  const preimage = Buffer.concat([idx, stringBytes(a), stringBytes(b)]);
   return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
 }
 

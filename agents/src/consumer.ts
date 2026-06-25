@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { AgentOutput, outputHash } from "./attest.js";
-import { loadKey, readQuorum, readAgreement, releaseVault, requestId } from "./casper.js";
+import { loadKey, readQuorum, readAgreement, depositVault, releaseVault, requestId } from "./casper.js";
 import { RWA_PROMPT } from "./producer.js";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -54,9 +54,10 @@ export async function autonomousRelease(
     await sleep(intervalMs);
   }
 
-  // Attempt the release regardless of the off-chain read — the contract is the source of
-  // truth. A genuine, quorum-attested output is authorized; anything else reverts on-chain.
-  const r = await releaseVault(key, reqId, hash, beneficiaryAccountHash);
+  // Bind the beneficiary on-chain (M2 deposit), then attempt the release — the contract is
+  // the source of truth: a genuine, quorum-attested output is authorized; anything else reverts.
+  await depositVault(key, reqId, beneficiaryAccountHash).catch(() => undefined);
+  const r = await releaseVault(key, reqId, hash);
   if (r.authorized) {
     return { decision: "PAY", reason: "quorum-attested — payout authorized on-chain", quorumHash, txHash: r.txHash, explorer: r.explorer };
   }

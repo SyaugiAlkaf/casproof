@@ -27,6 +27,7 @@ async function main() {
         odra_cfg_is_upgradable: CLValue.newCLValueBool(true),
         odra_cfg_is_upgrade: CLValue.newCLValueBool(false),
         registry: CLValue.newCLKey(Key.newKey(`hash-${REGISTRY_PACKAGE_HASH}`)),
+        authorized: CLValue.newCLKey(Key.newKey(key.publicKey.accountHash().toPrefixedString())),
       })
     )
     .from(key.publicKey)

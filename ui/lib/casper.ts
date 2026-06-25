@@ -16,10 +16,10 @@ const TRUSTED = (process.env.TRUSTED_SIGNERS ?? "")
 
 // Field indices track the storage-field declaration order in AttestationRegistry
 // (contract/src/lib.rs). Odra numbers module fields from 1 — keep in lockstep with
-// agents/src/casper.ts: attestations(5), agreement(6), quorum_output(7). Verified on testnet.
-const ATTESTATIONS_FIELD_INDEX = 5;
-const AGREEMENT_FIELD_INDEX = 6;
-const QUORUM_OUTPUT_FIELD_INDEX = 7;
+// Post-hardening layout (see agents/src/casper.ts): attestations(6), agreement(7), quorum_output(11).
+const ATTESTATIONS_FIELD_INDEX = 6;
+const AGREEMENT_FIELD_INDEX = 7;
+const QUORUM_OUTPUT_FIELD_INDEX = 11;
 const STATE_DICTIONARY = "state";
 
 export const rpc = new RpcClient(new HttpHandler(NODE_URL));
@@ -60,15 +60,18 @@ export async function readQuorum(reqId: string): Promise<string | null> {
 
 // How many distinct trusted signers have attested this exact output for this request.
 export async function readAgreement(reqId: string, outputHash: string): Promise<number> {
-  const b = await readStateBytes(AGREEMENT_FIELD_INDEX, `${reqId}#${outputHash}`);
+  const b = await readDictItem(stateItemKeyTuple(AGREEMENT_FIELD_INDEX, reqId, outputHash));
   return b ? u32le(b) : 0;
 }
 
 // Odra stores each field value as a CLValue List<U8> (the bytesrepr of the underlying
 // type). Read it raw and return the decoded byte array, or null if the item is absent.
 async function readStateBytes(fieldIndex: number, key: string): Promise<number[] | null> {
+  return readDictItem(stateItemKey(fieldIndex, key));
+}
+
+async function readDictItem(itemKey: string): Promise<number[] | null> {
   const seedUref = await resolveStateUref();
-  const itemKey = stateItemKey(fieldIndex, key);
   const srh = await stateRootHash();
   const body = {
     jsonrpc: "2.0",
@@ -137,13 +140,25 @@ async function resolveStateUref(): Promise<string> {
 
 // item key = hex(blake2b256( u32_be(field_index) ++ u32_le(len) ++ string_to_bytes(key) )),
 // mirroring Odra's odra-core contract_env::current_key for a top-level Mapping field.
+function stringBytes(s: string): Buffer {
+  const utf8 = Buffer.from(s, "utf8");
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(utf8.length, 0);
+  return Buffer.concat([len, utf8]);
+}
+
 export function stateItemKey(fieldIndex: number, key: string): string {
   const idx = Buffer.alloc(4);
   idx.writeUInt32BE(fieldIndex, 0);
-  const utf8 = Buffer.from(key, "utf8");
-  const len = Buffer.alloc(4);
-  len.writeUInt32LE(utf8.length, 0);
-  const preimage = Buffer.concat([idx, len, utf8]);
+  const preimage = Buffer.concat([idx, stringBytes(key)]);
+  return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
+}
+
+// Tuple (String, String) Mapping key: field_index_be ++ string_bytes(a) ++ string_bytes(b).
+export function stateItemKeyTuple(fieldIndex: number, a: string, b: string): string {
+  const idx = Buffer.alloc(4);
+  idx.writeUInt32BE(fieldIndex, 0);
+  const preimage = Buffer.concat([idx, stringBytes(a), stringBytes(b)]);
   return Buffer.from(blakejs.blake2b(preimage, undefined, 32)).toString("hex");
 }
 

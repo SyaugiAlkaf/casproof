@@ -397,6 +397,7 @@ impl AttestationRegistry {
             self.env().revert(Error::NotChallenged);
         }
         let bond = self.challenge_bond.get(&request_id).unwrap_or_default();
+        self.challenge_bond.set(&request_id, U512::zero());
         if uphold {
             let winner = self.quorum_output.get(&request_id).unwrap_or_revert(&self.env());
             let pair = (request_id.clone(), winner.clone());
@@ -1906,5 +1907,28 @@ mod tests {
             vault.try_release("req".into(), "h".into()),
             Err(Error::NoQuorum.into())
         );
+    }
+
+    #[test]
+    fn rechallenge_after_reject_accounts_bond_freshly() {
+        // The bond is zeroed on resolve, so re-opening a challenge after a reject refunds only
+        // the fresh bond on a later uphold — no stale accumulation drains the contract.
+        let env = odra_test::env();
+        let (mut registry, _s2) = registry_with_quorum(&env, 1_000_000);
+        let challenger = env.get_account(3);
+        env.set_caller(challenger);
+        registry.with_tokens(U512::from(200_000_000u64)).challenge("req".into(), "counter".into());
+        env.set_caller(env.get_account(0));
+        registry.resolve_challenge("req".into(), false);
+
+        let challenger2 = env.get_account(4);
+        let bond2 = U512::from(300_000_000u64);
+        let before2 = env.balance_of(&challenger2);
+        env.set_caller(challenger2);
+        registry.with_tokens(bond2).challenge("req".into(), "counter".into());
+        env.set_caller(env.get_account(0));
+        registry.resolve_challenge("req".into(), true);
+        assert!(registry.is_revoked("req".into()));
+        assert_eq!(env.balance_of(&challenger2), before2);
     }
 }

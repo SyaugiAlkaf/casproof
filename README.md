@@ -18,20 +18,21 @@ All transactions are on `casper-test` and verifiable on the explorer. Reproduce 
 
 | Contract | Hash |
 |---|---|
-| AttestationRegistry | [`b0898108...cac7d41`](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) |
-| PayoutVault | [`c7d68a16...63392b23`](https://testnet.cspr.live/contract/c7d68a16dcfd78aa9c0b6a7ed12b837b9a1dfd72bd4668e6361c2ec263392b23) |
+| AttestationRegistry | [`ecb2b8cc...3c57ca29`](https://testnet.cspr.live/contract/ecb2b8cc188254edc12d9f7f955fd000629fcfeef69c2912432d53053c57ca29) |
+| PayoutVault | [`c5e07023...71ce36ae`](https://testnet.cspr.live/contract/c5e070238a6e818272fb9c27fa25929a79187b7f48136ff4355c956671ce36ae) |
 
-**Request panel:** request id `823d1427b2bdfbae-mqsw4r8x` · k=2 of 2 signers (claude-opus-4-8, claude-sonnet-4-6)
+**Request panel:** request id `823d1427b2bdfbae-mqsyp55n` · k=2 of 2 signers (claude-opus-4-8, claude-sonnet-4-6)
 
 | Step | Transaction |
 |---|---|
-| Registry deploy (AttestationRegistry install) | [8e352175...843e907](https://testnet.cspr.live/deploy/8e352175570a775606a09e7b551083552654e699de3784d0a1b926a98843e907) |
-| set_quorum(2) | [35d59097...416b30ba](https://testnet.cspr.live/deploy/35d590977a678b2feb1d52b0b993838a193f71aecee3ba2bfab94a82416b30ba) |
-| set_trusted (onboard claude-sonnet-4-6 signer) | [c62ecb0e...6b752a02](https://testnet.cspr.live/deploy/c62ecb0e0b1284f8c1624b3fd8f8408047d343697040b90cc76507306b752a02) |
-| Vault deploy (PayoutVault install) | [6a361e78...d63c7725](https://testnet.cspr.live/deploy/6a361e78ec7c66e4a9f6db9434538982e34e602808d4d4433bdb2e0dd63c7725) |
-| Genuine attestation (claude-opus-4-8 signer) | [74fac27d...9c8b4b94](https://testnet.cspr.live/deploy/74fac27db23f5df223928dc60ab22852fabe5c7f945f41c46556743c9c8b4b94) |
-| PayoutVault.release SUCCESS (quorum met, PAY) | [b1e88bb8...e349ef54](https://testnet.cspr.live/deploy/b1e88bb8c06fa3fe9d7d7bae73a5b5ccc534ba4a9f918e6dd80311d6e349ef54) |
-| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [34e7b7a9...0a07e318](https://testnet.cspr.live/deploy/34e7b7a9afeaba9a4cf60e52ac28c98a99dc34063735e3e4617135080a07e318) |
+| Registry deploy (AttestationRegistry install) | [5210907205...bdcb639d](https://testnet.cspr.live/deploy/5210907205a89f96e74c0d90e568d6efd9eca757af5b337e36f395cfbdcb639d) |
+| set_quorum(2) | [bad51736...6bbd84d9](https://testnet.cspr.live/deploy/bad5173640585ad62803a498b8444cc250875c0b8c88b3bf8b063e5b6bbd84d9) |
+| set_trusted (onboard claude-sonnet-4-6 signer) | [e51338e2...620958f0](https://testnet.cspr.live/deploy/e51338e203df09ce440e44152948f906a818e3c1e845972cff612412620958f0) |
+| set_challenge_window (open the fraud-proof window) | [b52be1a6...494898a7a](https://testnet.cspr.live/deploy/b52be1a6d5f7429e6971da458b77e1ddff7b671272da579d87553ff494898a7a) |
+| Vault deploy (PayoutVault install) | [e61f23bb...62f8bc5a](https://testnet.cspr.live/deploy/e61f23bb5cc245cd2cde5da49bf202c6892a806a9f7052f4a76c28fb62f8bc5a) |
+| Genuine attestation (claude-opus-4-8 signer) | [ee9ae7b5...5be3e301](https://testnet.cspr.live/deploy/ee9ae7b50754cfac19bda6f3b21608a75deaaf8cf051c3e52781395a5be3e301) |
+| PayoutVault.release SUCCESS (quorum met, PAY) | [c1849015...6f7de077](https://testnet.cspr.live/deploy/c1849015bf503dcca17f3d659514f7674fa394254087d6fb8ab982696f7de077) |
+| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [8fc53e67...dd6a3645](https://testnet.cspr.live/deploy/8fc53e670612a9148e52f8d5c9adf32c9744200ed2b6227dfaa5bcafdd6a3645) |
 
 ## The problem
 
@@ -109,7 +110,7 @@ Casproof is not one application that verifies one thing. It is a composable guar
 
 Each composes the *same* `require_quorum` guard as the first line of its action, and each ships with adversarial tests proving a poisoned or under-quorum output reverts before the action runs.
 
-- **PayoutVault** — escrow a payout and release it only on a quorum-attested output. [Live on testnet](https://testnet.cspr.live/contract/c7d68a16dcfd78aa9c0b6a7ed12b837b9a1dfd72bd4668e6361c2ec263392b23); [genuine → PAY](https://testnet.cspr.live/deploy/b1e88bb8c06fa3fe9d7d7bae73a5b5ccc534ba4a9f918e6dd80311d6e349ef54), [poisoned → REVERT](https://testnet.cspr.live/deploy/34e7b7a9afeaba9a4cf60e52ac28c98a99dc34063735e3e4617135080a07e318).
+- **PayoutVault** — escrow a payout and release it only on a quorum-attested output. [Live on testnet](https://testnet.cspr.live/contract/c5e070238a6e818272fb9c27fa25929a79187b7f48136ff4355c956671ce36ae); [genuine → PAY](https://testnet.cspr.live/deploy/c1849015bf503dcca17f3d659514f7674fa394254087d6fb8ab982696f7de077), [poisoned → REVERT](https://testnet.cspr.live/deploy/8fc53e670612a9148e52f8d5c9adf32c9744200ed2b6227dfaa5bcafdd6a3645).
 - **OutcomeEscrow** — *the kill move.* A faithful rebuild of the OutcomePay / Escrow402 outcome-escrow pattern (stake on a predicted outcome, pay the winner on resolution) — but `settle` cross-calls `require_quorum` first, so it physically cannot pay on an unverified or poisoned outcome. The exact pattern two of the strongest competitors ship, made unbypassable by sitting beneath it.
 - **RWAValuationGate** — accept an RWA asset valuation only if it is quorum-attested, so downstream lending/collateral logic reads a value that provably passed k-of-n.
 - **OracleGatedSwap** — execute a swap only on a quorum-attested price feed; proves the guard gates a non-payout action, not just payouts.
@@ -128,7 +129,7 @@ self.do_action(); // unbypassable: no off-chain step between check and act
 
 Other agent-economy entries are applications: they verify an output and act on it, each with their own two-step trust logic. Casproof sits one layer below. Vouch writes an off-chain k-of-n verdict and then acts — two steps with a window. verity checks reputation and proceeds — verify then act. Either could call `require_quorum` as the first line of their action entrypoint and close the gap without rebuilding their trust logic. OutcomeEscrow above is exactly that move, done for the escrow pattern.
 
-Casproof is the slot the rest of the field plugs into. The guard is [live on Casper testnet](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) — any Casper contract can cross-call it today.
+Casproof is the slot the rest of the field plugs into. The guard is [live on Casper testnet](https://testnet.cspr.live/contract/ecb2b8cc188254edc12d9f7f955fd000629fcfeef69c2912432d53053c57ca29) — any Casper contract can cross-call it today.
 
 
 ## Security
@@ -173,7 +174,7 @@ Two liveness guarantees back it: a value-bearing consumer can compose `require_f
 
 This is owner-adjudicated optimistic verification today. Trustless resolution — a TEE/zkML recompute that adjudicates a challenge without an owner — is the roadmap; the challenge primitive is the slot it plugs into.
 
-> The challenge window and the three additional consumers ship in the contract and are covered by the test suite; the [live testnet registry](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) above runs the Phase-1 hardened gate (the PAY/REVERT demo). Redeploy with the Quickstart to put the challenge window and consumers on-chain.
+> The [live testnet registry](https://testnet.cspr.live/contract/ecb2b8cc188254edc12d9f7f955fd000629fcfeef69c2912432d53053c57ca29) above is the full hardened build: `challenge` / `resolve_challenge` / `finalize_stale_challenge` / `require_final_quorum` are deployed and the window is opened on-chain (the `set_challenge_window` tx in the table). The three additional reference consumers (OutcomeEscrow, RWAValuationGate, OracleGatedSwap) ship in the contract and are covered by the test suite; the live PAY/REVERT demo runs PayoutVault.
 
 
 ## Components

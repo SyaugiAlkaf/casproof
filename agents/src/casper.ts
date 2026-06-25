@@ -119,6 +119,11 @@ export async function setQuorum(key: PrivateKey, threshold: number): Promise<Adm
   return ownerCall(key, "set_quorum", { threshold: CLValue.newCLUInt32(threshold) });
 }
 
+// Owner-only: open the fraud-proof challenge window (block-time ms after quorum).
+export async function setChallengeWindow(key: PrivateKey, windowMs: number): Promise<AdminResult> {
+  return ownerCall(key, "set_challenge_window", { window: CLValue.newCLUint64(windowMs) });
+}
+
 // Owner-only: slash a signer caught diverging/colluding — revokes trust and lowers standing.
 export async function slashSigner(key: PrivateKey, signerAccountHash: string): Promise<AdminResult> {
   return ownerCall(key, "slash", { signer: CLValue.newCLKey(Key.newKey(signerAccountHash)) });

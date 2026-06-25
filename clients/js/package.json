@@ -1,6 +1,6 @@
 {
   "name": "casproof",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "description": "Verify-before-act for AI agent outputs on Casper — JS/TS client + CLI",
   "type": "module",
   "license": "Apache-2.0",

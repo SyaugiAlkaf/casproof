@@ -18,20 +18,20 @@ All transactions are on `casper-test` and verifiable on the explorer. Reproduce 
 
 | Contract | Hash |
 |---|---|
-| AttestationRegistry | [`1ef8d1ad...f91dc2`](https://testnet.cspr.live/contract/1ef8d1adf9078fbd392990685ba461785b03b77fb3f45ba5dd00bdbef5f91dc2) |
-| PayoutVault | [`1d0efbdd...42fe319`](https://testnet.cspr.live/contract/1d0efbdddea74baf8b180f33c5697b9efa346270e539334cf46978a4f42fe319) |
+| AttestationRegistry | [`b0898108...cac7d41`](https://testnet.cspr.live/contract/b089810867192d3da7d4ab61f0ac70acfd101685cedb6f551f4ca9734cac7d41) |
+| PayoutVault | [`c7d68a16...63392b23`](https://testnet.cspr.live/contract/c7d68a16dcfd78aa9c0b6a7ed12b837b9a1dfd72bd4668e6361c2ec263392b23) |
 
-**Request panel:** request id `823d1427b2bdfbae-mqrk0lcn` · k=2 of 2 signers (claude-opus-4-8, claude-sonnet-4-6)
+**Request panel:** request id `823d1427b2bdfbae-mqsw4r8x` · k=2 of 2 signers (claude-opus-4-8, claude-sonnet-4-6)
 
 | Step | Transaction |
 |---|---|
-| Registry deploy (AttestationRegistry install) | [ac63abe6...815fd6](https://testnet.cspr.live/deploy/ac63abe6b41030f7279ddeca2893d5461ce3ce69dd8ab26547287d77c9815fd6) |
-| set_quorum(2) | [26b828ff...7a74c60](https://testnet.cspr.live/deploy/26b828ff3c5fb70581700f463719c6294bc0a9e728e1c40e2a8f107ff7a74c60) |
-| set_trusted (onboard claude-sonnet-4-6 signer) | [779d8944...9fee01](https://testnet.cspr.live/deploy/779d8944a6e0ca885a32665c8959a7e64a993ddf1bf4d532cac9344d079fee01) |
-| Vault deploy (PayoutVault install) | [2f2aebad...4293e8](https://testnet.cspr.live/deploy/2f2aebadc10301da75023c05c9f54628247dfe39be294042e66372f28b4293e8) |
-| Genuine attestation (claude-opus-4-8 signer) | [96764d94...3d054bd](https://testnet.cspr.live/deploy/96764d94c84aa5ffc190de103c683bacf9a319638a282568079d610c33d054bd) |
-| PayoutVault.release SUCCESS (quorum met, PAY) | [4e419629...475bb730](https://testnet.cspr.live/deploy/4e419629ee121636bb93b7b2f2bf86662190c88b68cc4a3c32a19014475bb730) |
-| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [08215a1e...8246aa81](https://testnet.cspr.live/deploy/08215a1e12fec76e53f59a10404bea518cf8d5c6f359512964f6054d8246aa81) |
+| Registry deploy (AttestationRegistry install) | [8e352175...843e907](https://testnet.cspr.live/deploy/8e352175570a775606a09e7b551083552654e699de3784d0a1b926a98843e907) |
+| set_quorum(2) | [35d59097...416b30ba](https://testnet.cspr.live/deploy/35d590977a678b2feb1d52b0b993838a193f71aecee3ba2bfab94a82416b30ba) |
+| set_trusted (onboard claude-sonnet-4-6 signer) | [c62ecb0e...6b752a02](https://testnet.cspr.live/deploy/c62ecb0e0b1284f8c1624b3fd8f8408047d343697040b90cc76507306b752a02) |
+| Vault deploy (PayoutVault install) | [6a361e78...d63c7725](https://testnet.cspr.live/deploy/6a361e78ec7c66e4a9f6db9434538982e34e602808d4d4433bdb2e0dd63c7725) |
+| Genuine attestation (claude-opus-4-8 signer) | [74fac27d...9c8b4b94](https://testnet.cspr.live/deploy/74fac27db23f5df223928dc60ab22852fabe5c7f945f41c46556743c9c8b4b94) |
+| PayoutVault.release SUCCESS (quorum met, PAY) | [b1e88bb8...e349ef54](https://testnet.cspr.live/deploy/b1e88bb8c06fa3fe9d7d7bae73a5b5ccc534ba4a9f918e6dd80311d6e349ef54) |
+| PayoutVault.release REVERT (poisoned, NoQuorum / User error 4) | [34e7b7a9...0a07e318](https://testnet.cspr.live/deploy/34e7b7a9afeaba9a4cf60e52ac28c98a99dc34063735e3e4617135080a07e318) |
 
 ## The problem
 
